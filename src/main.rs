@@ -122,7 +122,10 @@ impl GlRenderer {
             varying float v_cross;
             void main() {
                 float d = abs(v_cross);
-                float alpha = 1.0 - smoothstep(0.5, 1.0, d);
+                // Gaussian falloff: solid core in center, soft edges.
+                // exp(-8 * d^2) gives ~full opacity up to d≈0.3, then
+                // a smooth bell-curve fade to near-zero at the edges.
+                float alpha = exp(-8.0 * d * d);
                 gl_FragColor = vec4(u_color.rgb, u_color.a * alpha);
             }
         "#;
@@ -519,7 +522,7 @@ impl App {
                         renderer.fade(0.005);
                         if draw {
                             // ~2px line in NDC for this output's resolution
-                            let line_width = 4.0 / os.height.min(os.width) as f64;
+                            let line_width = 12.0 / os.height.min(os.width) as f64;
                             verts.clear();
                             self.harmonograph.append_catmull_rom_strip(
                                 self.scale_x,
