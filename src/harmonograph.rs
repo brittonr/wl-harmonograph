@@ -148,13 +148,17 @@ impl Harmonograph {
     /// dimensions. By appending to an existing buffer the caller can accumulate
     /// multiple simulation steps into a single continuous strip, eliminating
     /// gaps at segment joints.
+    /// Append triangle-strip vertices for the current Catmull-Rom segment.
+    ///
+    /// Each vertex is `[x, y, cross]` where `cross` is +1.0 or -1.0 indicating
+    /// the side of the line center (used for shader-based edge antialiasing).
     pub fn append_catmull_rom_strip(
         &self,
         scale_x: f64,
         scale_y: f64,
         line_width: f64,
         n_subdivisions: usize,
-        verts: &mut Vec<[f32; 2]>,
+        verts: &mut Vec<[f32; 3]>,
     ) -> bool {
         let pts = match self.catmull_rom_points() {
             Some(p) => p,
@@ -197,8 +201,8 @@ impl Harmonograph {
             let nx = -dy / len * hw;
             let ny = dx / len * hw;
 
-            verts.push([(x + nx) as f32, (y + ny) as f32]);
-            verts.push([(x - nx) as f32, (y - ny) as f32]);
+            verts.push([(x + nx) as f32, (y + ny) as f32, 1.0]);
+            verts.push([(x - nx) as f32, (y - ny) as f32, -1.0]);
         }
 
         true

@@ -97,28 +97,38 @@ struct GlRenderer {
     blit_program: glow::Program,
     blit_vbo: glow::Buffer,
     u_color: glow::UniformLocation,
+    a_pos: u32,
+    a_cross: u32,
     width: u32,
     height: u32,
 }
 
 impl GlRenderer {
     unsafe fn new(gl: glow::Context, width: u32, height: u32, bg: Color) -> Self {
-        // --- Line drawing shader (draws into FBO with alpha blending) ---
+        // --- Line drawing shader with edge antialiasing ---
         let vs_src = r#"#version 100
             attribute vec2 a_pos;
+            attribute float a_cross;
+            varying float v_cross;
             void main() {
+                v_cross = a_cross;
                 gl_Position = vec4(a_pos, 0.0, 1.0);
             }
         "#;
         let fs_src = r#"#version 100
             precision mediump float;
             uniform vec4 u_color;
+            varying float v_cross;
             void main() {
-                gl_FragColor = u_color;
+                float d = abs(v_cross);
+                float alpha = 1.0 - smoothstep(0.5, 1.0, d);
+                gl_FragColor = vec4(u_color.rgb, u_color.a * alpha);
             }
         "#;
         let program = Self::create_program(&gl, vs_src, fs_src);
         let u_color = gl.get_uniform_location(program, "u_color").unwrap();
+        let a_pos = gl.get_attrib_location(program, "a_pos").unwrap();
+        let a_cross = gl.get_attrib_location(program, "a_cross").unwrap();
 
         // --- Blit shader (FBO texture → screen) ---
         let blit_vs = r#"#version 100
@@ -171,6 +181,8 @@ impl GlRenderer {
             blit_program,
             blit_vbo,
             u_color,
+            a_pos,
+            a_cross,
             width,
             height,
         }
@@ -254,7 +266,9 @@ impl GlRenderer {
     }
 
     /// Draw a triangle strip (the thickened curve segment) into the FBO.
-    unsafe fn draw_strip(&self, vertices: &[[f32; 2]], color: Color, alpha: f32) {
+    /// Vertices are packed as [x, y, cross] where cross is -1.0 or +1.0
+    /// indicating which side of the line center the vertex is on (for AA).
+    unsafe fn draw_strip(&self, vertices: &[[f32; 3]], color: Color, alpha: f32) {
         let gl = &self.gl;
         gl.bind_framebuffer(glow::FRAMEBUFFER, Some(self.fbo));
         gl.viewport(0, 0, self.width as i32, self.height as i32);
@@ -278,13 +292,17 @@ impl GlRenderer {
             glow::STREAM_DRAW,
         );
 
-        let a_pos = gl.get_attrib_location(self.program, "a_pos").unwrap();
-        gl.enable_vertex_attrib_array(a_pos);
-        gl.vertex_attrib_pointer_f32(a_pos, 2, glow::FLOAT, false, 8, 0);
+        // stride = 12 bytes (3 floats × 4 bytes)
+        gl.enable_vertex_attrib_array(self.a_pos);
+        gl.vertex_attrib_pointer_f32(self.a_pos, 2, glow::FLOAT, false, 12, 0);
+
+        gl.enable_vertex_attrib_array(self.a_cross);
+        gl.vertex_attrib_pointer_f32(self.a_cross, 1, glow::FLOAT, false, 12, 8);
 
         gl.draw_arrays(glow::TRIANGLE_STRIP, 0, vertices.len() as i32);
 
-        gl.disable_vertex_attrib_array(a_pos);
+        gl.disable_vertex_attrib_array(self.a_pos);
+        gl.disable_vertex_attrib_array(self.a_cross);
         gl.bind_framebuffer(glow::FRAMEBUFFER, None);
     }
 
@@ -326,9 +344,9 @@ fn cast_f32_slice(data: &[f32]) -> &[u8] {
     unsafe { std::slice::from_raw_parts(data.as_ptr() as *const u8, data.len() * 4) }
 }
 
-/// Cast &[[f32; 2]] → &[u8].
-fn cast_vert_slice(data: &[[f32; 2]]) -> &[u8] {
-    unsafe { std::slice::from_raw_parts(data.as_ptr() as *const u8, data.len() * 8) }
+/// Cast &[[f32; 3]] → &[u8].
+fn cast_vert_slice(data: &[[f32; 3]]) -> &[u8] {
+    unsafe { std::slice::from_raw_parts(data.as_ptr() as *const u8, data.len() * 12) }
 }
 
 // ---------------------------------------------------------------------------
@@ -418,7 +436,7 @@ impl App {
 
         // Accumulate all simulation steps into one continuous triangle strip
         // so there are no gaps at segment joints.
-        let mut verts: Vec<[f32; 2]> = Vec::new();
+        let mut verts: Vec<[f32; 3]> = Vec::new();
 
         for _ in 0..steps {
             if !self.harmonograph.advance() {
@@ -456,7 +474,7 @@ impl App {
     fn draw_on_all_outputs(
         &mut self,
         egl: &khronos_egl::Instance<khronos_egl::Static>,
-        verts: &[[f32; 2]],
+        verts: &[[f32; 3]],
         color: Color,
     ) {
         for (_wl, osurface) in &mut self.outputs {
@@ -875,7 +893,7 @@ fn main() {
         fg_colors,
         bg_color,
         current_color,
-        steps_per_tick: 3,
+        steps_per_tick: 1,
         scale_x: 0.4,
         scale_y: 0.4,
     };
@@ -889,13 +907,13 @@ fn main() {
         .insert(loop_handle.clone())
         .expect("insert wayland source");
 
-    // 10fps × 3 steps/tick = 30 steps/sec (matches original Python pacing)
+    // ~30fps × 1 step/tick = 30 steps/sec (matches original Python pacing)
     loop_handle
         .insert_source(
-            Timer::from_duration(Duration::from_millis(100)),
+            Timer::from_duration(Duration::from_millis(33)),
             |_, _, app| {
                 app.tick();
-                TimeoutAction::ToDuration(Duration::from_millis(100))
+                TimeoutAction::ToDuration(Duration::from_millis(33))
             },
         )
         .expect("insert timer");

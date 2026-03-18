@@ -44,13 +44,13 @@ exec wl-harmonograph
 ### Install
 
 ```bash
-nix run github:Mic92/wl-harmonograph
+nix run github:pinpox/wl-harmonograph
 ```
 
 Or:
 
 ```bash
-nix profile install github:Mic92/wl-harmonograph
+nix profile install github:pinpox/wl-harmonograph
 ```
 
 ### Configuration
