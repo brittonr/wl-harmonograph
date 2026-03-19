@@ -6,9 +6,11 @@
 //!   wl-harmonograph-ctl                     # interactive TUI
 //!   wl-harmonograph-ctl get                 # dump all params
 //!   wl-harmonograph-ctl set alpha 0.5       # set a param
+//!   wl-harmonograph-ctl set shape lorenz    # switch shape
 //!   wl-harmonograph-ctl restart             # clear + redraw
 //!   wl-harmonograph-ctl randomize           # new random pattern
 //!   wl-harmonograph-ctl next-color          # cycle color
+//!   wl-harmonograph-ctl next-shape          # cycle shape
 
 use std::collections::HashMap;
 use std::io::{self, Read, Write as _};
@@ -70,8 +72,8 @@ fn send_action(action: &str) {
 // ---------------------------------------------------------------------------
 
 struct Param {
-    key: &'static str,
-    label: &'static str,
+    key: String,
+    label: String,
     min: f64,
     max: f64,
     step: f64,
@@ -81,93 +83,270 @@ struct Param {
 }
 
 struct Section {
-    name: &'static str,
+    name: String,
     start: usize,
     count: usize,
 }
 
-fn build_params() -> (Vec<Param>, Vec<Section>) {
-    let p = |key, label, min, max, step, fine, decimals| Param {
-        key,
-        label,
-        min,
-        max,
-        step,
-        fine,
-        decimals,
-        value: 0.0,
-    };
-
-    let params = vec![
+/// Known parameter ranges. Returns (min, max, step, fine, decimals).
+fn param_spec(key: &str) -> (f64, f64, f64, f64, usize) {
+    match key {
         // Drawing
-        p("line_width", "Line Width", 0.5, 20.0, 0.5, 0.1, 1),
-        p("alpha", "Alpha", 0.01, 1.0, 0.05, 0.01, 2),
-        p("fade", "Fade", 0.0, 0.1, 0.005, 0.001, 4),
-        p("speed", "Speed", 1.0, 50.0, 1.0, 1.0, 0),
+        "line_width" => (0.5, 20.0, 0.5, 0.1, 1),
+        "alpha" => (0.01, 1.0, 0.05, 0.01, 2),
+        "fade" => (0.0, 0.1, 0.005, 0.001, 4),
+        "speed" => (1.0, 50.0, 1.0, 1.0, 0),
         // Dithering
-        p("dither", "Strength", 0.0, 1.0, 0.05, 0.01, 2),
-        p("dither_levels", "Levels", 2.0, 256.0, 4.0, 1.0, 0),
-        p("dither_scale", "Scale", 1.0, 8.0, 0.5, 0.1, 1),
-        // Pendulum X1
-        p("x1.freq", "Frequency", 0.1, 16.0, 0.1, 0.01, 3),
-        p("x1.amp", "Amplitude", 0.0, 2.0, 0.05, 0.01, 3),
-        p("x1.phase", "Phase", 0.0, 6.283, 0.1, 0.01, 3),
-        p("x1.damping", "Damping", 0.0, 0.05, 0.001, 0.0001, 4),
-        // Pendulum X2
-        p("x2.freq", "Frequency", 0.1, 16.0, 0.1, 0.01, 3),
-        p("x2.amp", "Amplitude", 0.0, 2.0, 0.05, 0.01, 3),
-        p("x2.phase", "Phase", 0.0, 6.283, 0.1, 0.01, 3),
-        p("x2.damping", "Damping", 0.0, 0.05, 0.001, 0.0001, 4),
-        // Pendulum Y1
-        p("y1.freq", "Frequency", 0.1, 16.0, 0.1, 0.01, 3),
-        p("y1.amp", "Amplitude", 0.0, 2.0, 0.05, 0.01, 3),
-        p("y1.phase", "Phase", 0.0, 6.283, 0.1, 0.01, 3),
-        p("y1.damping", "Damping", 0.0, 0.05, 0.001, 0.0001, 4),
-        // Pendulum Y2
-        p("y2.freq", "Frequency", 0.1, 16.0, 0.1, 0.01, 3),
-        p("y2.amp", "Amplitude", 0.0, 2.0, 0.05, 0.01, 3),
-        p("y2.phase", "Phase", 0.0, 6.283, 0.1, 0.01, 3),
-        p("y2.damping", "Damping", 0.0, 0.05, 0.001, 0.0001, 4),
-    ];
-
-    let sections = vec![
-        Section { name: "Drawing", start: 0, count: 4 },
-        Section { name: "Dithering", start: 4, count: 3 },
-        Section { name: "Pendulum X1", start: 7, count: 4 },
-        Section { name: "Pendulum X2", start: 11, count: 4 },
-        Section { name: "Pendulum Y1", start: 15, count: 4 },
-        Section { name: "Pendulum Y2", start: 19, count: 4 },
-    ];
-
-    (params, sections)
+        "dither" => (0.0, 1.0, 0.05, 0.01, 2),
+        "dither_levels" => (2.0, 256.0, 4.0, 1.0, 0),
+        "dither_scale" => (1.0, 8.0, 0.5, 0.1, 1),
+        // Harmonograph pendulum params
+        k if k.ends_with(".freq") => (0.1, 16.0, 0.1, 0.01, 3),
+        k if k.ends_with(".amp") || k.ends_with(".amplitude") => (0.0, 2.0, 0.05, 0.01, 3),
+        k if k.ends_with(".phase") => (0.0, 6.283, 0.1, 0.01, 3),
+        k if k.ends_with(".damping") => (0.0, 0.05, 0.001, 0.0001, 4),
+        // Spirograph
+        "spiro.big_r" => (0.1, 3.0, 0.1, 0.01, 3),
+        "spiro.small_r" => (0.01, 2.0, 0.05, 0.005, 3),
+        "spiro.offset" => (0.01, 2.0, 0.05, 0.01, 3),
+        "spiro.inner" => (0.0, 1.0, 1.0, 1.0, 0),
+        // Lissajous
+        "liss.freq_a" | "liss.freq_b" => (0.1, 16.0, 0.1, 0.01, 3),
+        "liss.delta" => (0.0, 6.283, 0.1, 0.01, 3),
+        // Rose
+        "rose.k" => (0.1, 12.0, 0.1, 0.01, 3),
+        "rose.k2" => (0.0, 12.0, 0.5, 0.1, 3),
+        "rose.mix" => (0.0, 1.0, 0.05, 0.01, 3),
+        // Butterfly
+        "bfly.wing_freq" => (1.0, 10.0, 0.5, 0.1, 1),
+        "bfly.tail_freq" => (4.0, 48.0, 2.0, 0.5, 1),
+        // Lorenz
+        "lorenz.sigma" => (1.0, 30.0, 0.5, 0.1, 1),
+        "lorenz.rho" => (1.0, 60.0, 1.0, 0.1, 1),
+        "lorenz.beta" => (0.1, 10.0, 0.2, 0.05, 2),
+        "lorenz.dt" => (0.001, 0.02, 0.001, 0.0001, 4),
+        "lorenz.max_steps" => (1000.0, 200000.0, 5000.0, 1000.0, 0),
+        // Common
+        "max_t" => (10.0, 2000.0, 50.0, 10.0, 0),
+        "step" => (0.001, 0.1, 0.005, 0.001, 3),
+        // Fallback
+        _ => (0.0, 100.0, 1.0, 0.1, 3),
+    }
 }
 
-/// Parse the `get` response into a key→value map.
-fn parse_get_response(response: &str) -> HashMap<String, f64> {
-    let mut map = HashMap::new();
-    for line in response.lines() {
-        if let Some((key, val_str)) = line.split_once('=') {
-            if let Ok(v) = val_str.parse::<f64>() {
-                map.insert(key.to_string(), v);
+/// Pretty label for a param key.
+fn param_label(key: &str) -> String {
+    match key {
+        "line_width" => "Line Width".into(),
+        "alpha" => "Alpha".into(),
+        "fade" => "Fade".into(),
+        "speed" => "Speed".into(),
+        "dither" => "Strength".into(),
+        "dither_levels" => "Levels".into(),
+        "dither_scale" => "Scale".into(),
+        "max_t" => "Max Time".into(),
+        "step" => "Step Size".into(),
+        _ => {
+            // Strip prefix, capitalize: "x1.freq" -> "Frequency", "spiro.big_r" -> "Big R"
+            let suffix = key.rsplit('.').next().unwrap_or(key);
+            let mut label = String::new();
+            let mut capitalize = true;
+            for ch in suffix.chars() {
+                if ch == '_' {
+                    label.push(' ');
+                    capitalize = true;
+                } else if capitalize {
+                    label.push(ch.to_ascii_uppercase());
+                    capitalize = false;
+                } else {
+                    label.push(ch);
+                }
+            }
+            // Special cases
+            match label.as_str() {
+                "Freq" => "Frequency".into(),
+                "Amp" => "Amplitude".into(),
+                "Freq a" | "Freq A" => "Freq A".into(),
+                "Freq b" | "Freq B" => "Freq B".into(),
+                "Dt" => "Time Step".into(),
+                "Big r" | "Big R" => "Outer Radius".into(),
+                "Small r" | "Small R" => "Inner Radius".into(),
+                "Offset" => "Pen Offset".into(),
+                "Wing freq" => "Wing Freq".into(),
+                "Tail freq" => "Tail Freq".into(),
+                "Max steps" => "Max Steps".into(),
+                _ => label,
             }
         }
     }
-    map
 }
 
-/// Fetch current values from the daemon and populate params.
-fn fetch_values(params: &mut [Param]) -> bool {
-    match send_command("get") {
-        Ok(resp) => {
-            let map = parse_get_response(&resp);
-            for p in params.iter_mut() {
-                if let Some(&v) = map.get(p.key) {
-                    p.value = v;
+/// Section name from a group of param key prefixes.
+fn section_name(prefix: &str) -> String {
+    match prefix {
+        "drawing" => "Drawing".into(),
+        "dithering" => "Dithering".into(),
+        "x1" => "Pendulum X1".into(),
+        "x2" => "Pendulum X2".into(),
+        "y1" => "Pendulum Y1".into(),
+        "y2" => "Pendulum Y2".into(),
+        "spiro" => "Spirograph".into(),
+        "liss" => "Lissajous".into(),
+        "rose" => "Rose".into(),
+        "bfly" => "Butterfly".into(),
+        "lorenz" => "Lorenz".into(),
+        "sim" => "Simulation".into(),
+        _ => prefix.to_string(),
+    }
+}
+
+/// Parse the `get` response into (shape_name, key→value map).
+fn parse_get_response(response: &str) -> (String, Vec<(String, f64)>) {
+    let mut shape = String::new();
+    let mut params = Vec::new();
+    for line in response.lines() {
+        if let Some((key, val_str)) = line.split_once('=') {
+            if key == "shape" {
+                shape = val_str.to_string();
+            } else if key == "bg" || key == "color" {
+                // skip non-numeric compound values
+            } else if let Ok(v) = val_str.parse::<f64>() {
+                params.push((key.to_string(), v));
+            }
+        }
+    }
+    (shape, params)
+}
+
+/// Build the param list and sections from the daemon's current state.
+fn build_params_from_daemon() -> Option<(String, Vec<Param>, Vec<Section>)> {
+    let resp = send_command("get").ok()?;
+    let (shape, raw_params) = parse_get_response(&resp);
+
+    // Classify params into groups
+    let drawing_keys = ["line_width", "alpha", "fade", "speed"];
+    let dither_keys = ["dither", "dither_levels", "dither_scale"];
+    let sim_keys = ["max_t", "step"];
+
+    let mut params = Vec::new();
+    let mut sections = Vec::new();
+
+    // Drawing section
+    let start = params.len();
+    let mut count = 0;
+    for &dk in &drawing_keys {
+        if let Some((_, v)) = raw_params.iter().find(|(k, _)| k == dk) {
+            let (min, max, step, fine, decimals) = param_spec(dk);
+            params.push(Param {
+                key: dk.to_string(),
+                label: param_label(dk),
+                min, max, step, fine, decimals,
+                value: *v,
+            });
+            count += 1;
+        }
+    }
+    if count > 0 {
+        sections.push(Section { name: "Drawing".into(), start, count });
+    }
+
+    // Dithering section
+    let start = params.len();
+    let mut count = 0;
+    for &dk in &dither_keys {
+        if let Some((_, v)) = raw_params.iter().find(|(k, _)| k == dk) {
+            let (min, max, step, fine, decimals) = param_spec(dk);
+            params.push(Param {
+                key: dk.to_string(),
+                label: param_label(dk),
+                min, max, step, fine, decimals,
+                value: *v,
+            });
+            count += 1;
+        }
+    }
+    if count > 0 {
+        sections.push(Section { name: "Dithering".into(), start, count });
+    }
+
+    // Shape-specific params (grouped by prefix before '.')
+    let shape_params: Vec<&(String, f64)> = raw_params.iter()
+        .filter(|(k, _)| {
+            !drawing_keys.contains(&k.as_str())
+                && !dither_keys.contains(&k.as_str())
+                && !sim_keys.contains(&k.as_str())
+        })
+        .collect();
+
+    // Collect unique prefixes in order
+    let mut seen_prefixes = Vec::new();
+    for (k, _) in &shape_params {
+        let prefix = k.split('.').next().unwrap_or(k);
+        if !seen_prefixes.contains(&prefix.to_string()) {
+            seen_prefixes.push(prefix.to_string());
+        }
+    }
+
+    for prefix in &seen_prefixes {
+        let start = params.len();
+        let mut count = 0;
+        for (k, v) in &shape_params {
+            let p = k.split('.').next().unwrap_or(k);
+            if p == prefix {
+                let (min, max, step, fine, decimals) = param_spec(k);
+                params.push(Param {
+                    key: k.clone(),
+                    label: param_label(k),
+                    min, max, step, fine, decimals,
+                    value: *v,
+                });
+                count += 1;
+            }
+        }
+        if count > 0 {
+            sections.push(Section { name: section_name(prefix), start, count });
+        }
+    }
+
+    // Simulation params (max_t, step)
+    let start = params.len();
+    let mut count = 0;
+    for &sk in &sim_keys {
+        if let Some((_, v)) = raw_params.iter().find(|(k, _)| k == sk) {
+            let (min, max, step, fine, decimals) = param_spec(sk);
+            params.push(Param {
+                key: sk.to_string(),
+                label: param_label(sk),
+                min, max, step, fine, decimals,
+                value: *v,
+            });
+            count += 1;
+        }
+    }
+    if count > 0 {
+        sections.push(Section { name: "Simulation".into(), start, count });
+    }
+
+    Some((shape, params, sections))
+}
+
+/// Refresh param values from the daemon without rebuilding the list.
+#[allow(dead_code)]
+fn refresh_values(params: &mut [Param]) {
+    if let Ok(resp) = send_command("get") {
+        let mut map = HashMap::new();
+        for line in resp.lines() {
+            if let Some((key, val_str)) = line.split_once('=') {
+                if let Ok(v) = val_str.parse::<f64>() {
+                    map.insert(key.to_string(), v);
                 }
             }
-            true
         }
-        Err(_) => false,
+        for p in params.iter_mut() {
+            if let Some(&v) = map.get(&p.key) {
+                p.value = v;
+            }
+        }
     }
 }
 
@@ -175,7 +354,6 @@ fn fetch_values(params: &mut [Param]) -> bool {
 // Display line mapping (for scroll tracking)
 // ---------------------------------------------------------------------------
 
-/// Each visible row is either a section header, a param slider, or a gap.
 enum DisplayLine {
     Header(usize),
     Param(usize),
@@ -196,7 +374,6 @@ fn build_display_lines(sections: &[Section]) -> Vec<DisplayLine> {
     lines
 }
 
-/// Find the display-line index for a given param index.
 fn param_display_row(lines: &[DisplayLine], param_idx: usize) -> usize {
     for (i, line) in lines.iter().enumerate() {
         if let DisplayLine::Param(idx) = line {
@@ -219,13 +396,14 @@ fn draw(
     display_lines: &[DisplayLine],
     selected: usize,
     scroll: usize,
+    shape_name: &str,
 ) {
     terminal
         .draw(|frame| {
             let area = frame.area();
 
-            // Layout: header (1) | body (flex) | footer (1)
             let chunks = Layout::vertical([
+                Constraint::Length(1),
                 Constraint::Length(1),
                 Constraint::Min(0),
                 Constraint::Length(1),
@@ -241,11 +419,24 @@ fn draw(
                         .fg(Color::White)
                         .add_modifier(Modifier::BOLD),
                 ),
+                Span::styled("  shape: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    shape_name,
+                    Style::default()
+                        .fg(Color::Magenta)
+                        .add_modifier(Modifier::BOLD),
+                ),
             ]);
             frame.render_widget(Paragraph::new(header), chunks[0]);
 
+            // --- Separator ---
+            frame.render_widget(
+                Paragraph::new(""),
+                chunks[1],
+            );
+
             // --- Body: scrollable param list ---
-            let body = chunks[1];
+            let body = chunks[2];
             let visible_rows = body.height as usize;
 
             for (vi, line) in display_lines
@@ -262,7 +453,7 @@ fn draw(
 
                 match line {
                     DisplayLine::Header(si) => {
-                        let name = sections[*si].name;
+                        let name = &sections[*si].name;
                         let hdr = Paragraph::new(Line::from(Span::styled(
                             format!(" {}", name),
                             Style::default()
@@ -275,7 +466,6 @@ fn draw(
                         let p = &params[*idx];
                         let is_sel = *idx == selected;
 
-                        // Split row: marker+label | bar | value
                         let label_w = 18u16;
                         let value_w = 10u16;
                         let bar_w = row_area.width.saturating_sub(label_w + value_w + 1);
@@ -287,7 +477,6 @@ fn draw(
                         ])
                         .split(row_area);
 
-                        // Label
                         let marker = if is_sel { " ▸ " } else { "   " };
                         let label_style = if is_sel {
                             Style::default()
@@ -304,7 +493,6 @@ fn draw(
                             parts[0],
                         );
 
-                        // Slider (rat-widgets)
                         let frac = if p.max > p.min {
                             (p.value - p.min) / (p.max - p.min)
                         } else {
@@ -329,7 +517,6 @@ fn draw(
                             .with_thumb_style(thumb);
                         slider.render(frame, parts[1]);
 
-                        // Value
                         let val_style = if is_sel {
                             Style::default()
                                 .fg(Color::White)
@@ -359,6 +546,8 @@ fn draw(
                 Span::styled(" fine  ", Style::default().fg(Color::Gray)),
                 Span::styled("r", Style::default().fg(Color::Yellow)),
                 Span::styled(" random  ", Style::default().fg(Color::Gray)),
+                Span::styled("s", Style::default().fg(Color::Yellow)),
+                Span::styled(" shape  ", Style::default().fg(Color::Gray)),
                 Span::styled("c", Style::default().fg(Color::Yellow)),
                 Span::styled(" color  ", Style::default().fg(Color::Gray)),
                 Span::styled("space", Style::default().fg(Color::Yellow)),
@@ -366,7 +555,7 @@ fn draw(
                 Span::styled("q", Style::default().fg(Color::Yellow)),
                 Span::styled(" quit", Style::default().fg(Color::Gray)),
             ]);
-            frame.render_widget(Paragraph::new(footer), chunks[2]);
+            frame.render_widget(Paragraph::new(footer), chunks[3]);
         })
         .unwrap();
 }
@@ -376,14 +565,9 @@ fn draw(
 // ---------------------------------------------------------------------------
 
 fn run_tui() -> Result<(), String> {
-    let (mut params, sections) = build_params();
-    let total = params.len();
-    let display_lines = build_display_lines(&sections);
-
-    let connected = fetch_values(&mut params);
-    if !connected {
-        return Err("cannot connect — is wl-harmonograph running?".into());
-    }
+    let (mut shape_name, mut params, mut sections) =
+        build_params_from_daemon().ok_or("cannot connect — is wl-harmonograph running?")?;
+    let mut display_lines = build_display_lines(&sections);
 
     terminal::enable_raw_mode().map_err(|e| e.to_string())?;
     let mut stdout = io::stdout();
@@ -396,8 +580,10 @@ fn run_tui() -> Result<(), String> {
     let mut scroll: usize = 0;
 
     loop {
+        let total = params.len();
+
         // Keep selection visible
-        let visible = terminal.size().map(|s| s.height as usize).unwrap_or(24).saturating_sub(3);
+        let visible = terminal.size().map(|s| s.height as usize).unwrap_or(24).saturating_sub(4);
         let sel_row = param_display_row(&display_lines, selected);
         if sel_row < scroll + 1 {
             scroll = sel_row.saturating_sub(1);
@@ -405,7 +591,7 @@ fn run_tui() -> Result<(), String> {
             scroll = sel_row + 2 - visible;
         }
 
-        draw(&mut terminal, &params, &sections, &display_lines, selected, scroll);
+        draw(&mut terminal, &params, &sections, &display_lines, selected, scroll, &shape_name);
 
         if !event::poll(Duration::from_millis(100)).unwrap_or(false) {
             continue;
@@ -449,44 +635,74 @@ fn run_tui() -> Result<(), String> {
                 KeyCode::Right | KeyCode::Char('l')
                     if !modifiers.contains(KeyModifiers::SHIFT) =>
                 {
-                    let p = &mut params[selected];
-                    p.value = (p.value + p.step).min(p.max);
-                    send_set(p.key, p.value);
+                    if selected < total {
+                        let p = &mut params[selected];
+                        p.value = (p.value + p.step).min(p.max);
+                        send_set(&p.key, p.value);
+                    }
                 }
                 KeyCode::Left | KeyCode::Char('h')
                     if !modifiers.contains(KeyModifiers::SHIFT) =>
                 {
-                    let p = &mut params[selected];
-                    p.value = (p.value - p.step).max(p.min);
-                    send_set(p.key, p.value);
+                    if selected < total {
+                        let p = &mut params[selected];
+                        p.value = (p.value - p.step).max(p.min);
+                        send_set(&p.key, p.value);
+                    }
                 }
 
-                // Fine adjust (shift+arrow or H/L)
+                // Fine adjust
                 KeyCode::Right if modifiers.contains(KeyModifiers::SHIFT) => {
-                    let p = &mut params[selected];
-                    p.value = (p.value + p.fine).min(p.max);
-                    send_set(p.key, p.value);
+                    if selected < total {
+                        let p = &mut params[selected];
+                        p.value = (p.value + p.fine).min(p.max);
+                        send_set(&p.key, p.value);
+                    }
                 }
                 KeyCode::Left if modifiers.contains(KeyModifiers::SHIFT) => {
-                    let p = &mut params[selected];
-                    p.value = (p.value - p.fine).max(p.min);
-                    send_set(p.key, p.value);
+                    if selected < total {
+                        let p = &mut params[selected];
+                        p.value = (p.value - p.fine).max(p.min);
+                        send_set(&p.key, p.value);
+                    }
                 }
                 KeyCode::Char('H') => {
-                    let p = &mut params[selected];
-                    p.value = (p.value - p.fine).max(p.min);
-                    send_set(p.key, p.value);
+                    if selected < total {
+                        let p = &mut params[selected];
+                        p.value = (p.value - p.fine).max(p.min);
+                        send_set(&p.key, p.value);
+                    }
                 }
                 KeyCode::Char('L') => {
-                    let p = &mut params[selected];
-                    p.value = (p.value + p.fine).min(p.max);
-                    send_set(p.key, p.value);
+                    if selected < total {
+                        let p = &mut params[selected];
+                        p.value = (p.value + p.fine).min(p.max);
+                        send_set(&p.key, p.value);
+                    }
                 }
 
                 // Actions
                 KeyCode::Char('r') => {
                     send_action("randomize");
-                    fetch_values(&mut params);
+                    // Shape may have changed — rebuild param list
+                    if let Some((sn, p, s)) = build_params_from_daemon() {
+                        shape_name = sn;
+                        params = p;
+                        sections = s;
+                        display_lines = build_display_lines(&sections);
+                        selected = selected.min(params.len().saturating_sub(1));
+                    }
+                }
+                KeyCode::Char('s') => {
+                    send_action("next-shape");
+                    // Rebuild for the new shape's params
+                    if let Some((sn, p, s)) = build_params_from_daemon() {
+                        shape_name = sn;
+                        params = p;
+                        sections = s;
+                        display_lines = build_display_lines(&sections);
+                        selected = selected.min(params.len().saturating_sub(1));
+                    }
                 }
                 KeyCode::Char('c') => {
                     send_action("next-color");
@@ -497,12 +713,11 @@ fn run_tui() -> Result<(), String> {
 
                 _ => {}
             },
-            Ok(Event::Resize(_, _)) => {} // redraw next loop
+            Ok(Event::Resize(_, _)) => {}
             _ => {}
         }
     }
 
-    // Cleanup
     execute!(
         terminal.backend_mut(),
         LeaveAlternateScreen,
@@ -522,7 +737,6 @@ fn main() {
     let args: Vec<String> = std::env::args().collect();
 
     if args.len() > 1 {
-        // CLI mode: join remaining args as the command
         let cmd = args[1..].join(" ");
         match send_command(&cmd) {
             Ok(resp) => print!("{}", resp),
@@ -532,7 +746,6 @@ fn main() {
             }
         }
     } else {
-        // Interactive TUI
         if let Err(e) = run_tui() {
             eprintln!("error: {}", e);
             std::process::exit(1);

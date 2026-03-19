@@ -8,8 +8,19 @@ own frequency, phase, amplitude, and damping. The interference between these
 pendulums traces out intricate, slowly decaying curves.
 
 When a pattern finishes, the screen clears and a new one begins with fresh
-random parameters and a different color, resulting in a unique wallpaper on
-every restart.
+random parameters, a different color, and potentially a different shape,
+resulting in a unique wallpaper on every restart.
+
+Six shape types are available:
+
+| Shape | Description |
+|---|---|
+| **harmonograph** | Four damped pendulums — the classic |
+| **spirograph** | Hypotrochoid/epitrochoid curves (like the drawing toy) |
+| **lissajous** | Two sinusoids with different frequencies |
+| **rose** | Polar flower curves with optional compound petals |
+| **butterfly** | Temple Fay's butterfly curve (1989) |
+| **lorenz** | Lorenz strange attractor — chaotic double-spiral |
 
 <p align="center">
   <img src="https://github.com/user-attachments/assets/c6d704e0-d39b-4620-974b-209fdba3255a" width="30%" />
@@ -69,6 +80,12 @@ export HARMONOGRAPH_BG="#1d2021"
 
 Default colors are gruvbox-inspired.
 
+**Shape:**
+
+| Variable | Default | Description |
+|---|---|---|
+| `HARMONOGRAPH_SHAPE` | `random` | Shape type or `random` to cycle through all |
+
 **Rendering:**
 
 | Variable | Default | Description |
@@ -121,18 +138,19 @@ dithering, and all four pendulum parameters (frequency, amplitude, phase,
 damping) with immediate visual feedback on the wallpaper.
 
 ```
-● wl-harmonograph
+● wl-harmonograph  shape: spirograph
   Drawing
   ▸ Line Width     ████████░░░░░░░░░░░░       2.0
     Alpha          █████████████████░░░       0.85
     Fade           █░░░░░░░░░░░░░░░░░░░     0.0050
     Speed          █░░░░░░░░░░░░░░░░░░░       1
 
-  Pendulum X1
-    Frequency      ██████░░░░░░░░░░░░░░      2.030
+  Spirograph
+    Outer Radius   ██████████░░░░░░░░░░      1.000
+    Inner Radius   ████░░░░░░░░░░░░░░░░      0.333
     ...
 
-  ↑↓ select  ←→ adjust  shift+←→ fine  r random  c color  space restart  q quit
+  ↑↓ select  ←→ adjust  shift+←→ fine  r random  s shape  c color  space restart  q quit
 ```
 
 You can also send one-off commands from scripts:
@@ -141,8 +159,10 @@ You can also send one-off commands from scripts:
 wl-harmonograph-ctl get                   # dump all current values
 wl-harmonograph-ctl set alpha 0.5         # set a parameter
 wl-harmonograph-ctl set bg '#282828'      # change background color
-wl-harmonograph-ctl randomize             # new random pattern
+wl-harmonograph-ctl set shape lorenz      # switch to a specific shape
+wl-harmonograph-ctl randomize             # new random pattern + shape
 wl-harmonograph-ctl next-color            # cycle foreground color
+wl-harmonograph-ctl next-shape            # cycle to next shape type
 wl-harmonograph-ctl restart               # clear canvas, redraw with current params
 ```
 

@@ -7,7 +7,7 @@
 //! triangle-strip draw calls — all rasterization happens on the GPU.
 
 mod control;
-mod harmonograph;
+mod shapes;
 
 use std::env;
 use std::io::Write;
@@ -18,7 +18,7 @@ use calloop::EventLoop;
 use calloop_wayland_source::WaylandSource;
 use control::ControlSocket;
 use glow::HasContext;
-use harmonograph::Harmonograph;
+use shapes::CurveDrawer;
 use log::{info, warn};
 use rand::Rng;
 use smithay_client_toolkit::compositor::{CompositorHandler, CompositorState};
@@ -507,7 +507,8 @@ struct App {
 
     control: Option<ControlSocket>,
     outputs: Vec<(wl_output::WlOutput, Option<OutputSurface>)>,
-    harmonograph: Harmonograph,
+    curve: CurveDrawer,
+    shape_lock: Option<String>,
     fg_colors: Vec<Color>,
     bg_color: Color,
     current_color: Color,
@@ -556,8 +557,17 @@ impl App {
                 }
             }
         }
-        self.harmonograph.randomize();
+        if let Some(ref lock) = self.shape_lock {
+            // Locked to a specific shape — re-randomize same type
+            let name = lock.clone();
+            self.curve.switch_shape(&name);
+        } else {
+            self.curve.randomize_new_shape();
+        }
         self.pick_new_color();
+        info!("New pattern: shape={}, color=({:.2},{:.2},{:.2})",
+              self.curve.shape.name(),
+              self.current_color.0, self.current_color.1, self.current_color.2);
     }
 
     fn tick(&mut self) {
@@ -568,7 +578,7 @@ impl App {
         let mut advanced = false;
 
         for _ in 0..steps {
-            if !self.harmonograph.advance() {
+            if !self.curve.advance() {
                 // Render whatever we have, then restart
                 self.render_all_outputs(advanced, color, bg);
                 self.restart();
@@ -608,7 +618,7 @@ impl App {
                             let line_width =
                                 self.line_width * 6.0 / os.height.min(os.width) as f64;
                             verts.clear();
-                            self.harmonograph.append_catmull_rom_strip(
+                            self.curve.append_catmull_rom_strip(
                                 self.scale_x,
                                 self.scale_y,
                                 line_width,
@@ -800,12 +810,14 @@ impl App {
             Some("restart") => self.cmd_restart(),
             Some("randomize") => self.cmd_randomize(),
             Some("next-color") => self.cmd_next_color(),
+            Some("next-shape") => self.cmd_next_shape(),
             _ => format!("error: unknown command '{}'\n", cmd),
         }
     }
 
     fn cmd_get(&self) -> String {
         let mut out = String::new();
+        out.push_str(&format!("shape={}\n", self.curve.shape.name()));
         out.push_str(&format!("line_width={}\n", self.line_width));
         out.push_str(&format!("alpha={}\n", self.line_alpha));
         out.push_str(&format!("fade={}\n", self.fade_amount));
@@ -821,7 +833,7 @@ impl App {
             "color={},{},{}\n",
             self.current_color.0, self.current_color.1, self.current_color.2
         ));
-        for (name, val) in self.harmonograph.all_params() {
+        for (name, val) in self.curve.shape.all_params() {
             out.push_str(&format!("{}={}\n", name, val));
         }
         out
@@ -856,9 +868,37 @@ impl App {
                     "error: invalid hex color\n".into()
                 }
             }
+            "shape" => {
+                if shapes::SHAPE_NAMES.contains(&value_str) {
+                    self.curve.switch_shape(value_str);
+                    // Clear all outputs for the new shape
+                    for (_wl, osurface) in &mut self.outputs {
+                        if let Some(os) = osurface {
+                            if let Some(ref renderer) = os.renderer {
+                                self.egl
+                                    .make_current(
+                                        self.egl_display,
+                                        Some(os.egl_surface),
+                                        Some(os.egl_surface),
+                                        Some(self.egl_context),
+                                    )
+                                    .unwrap();
+                                unsafe { renderer.clear() };
+                            }
+                        }
+                    }
+                    "ok\n".into()
+                } else {
+                    format!(
+                        "error: unknown shape '{}' (available: {})\n",
+                        value_str,
+                        shapes::SHAPE_NAMES.join(", ")
+                    )
+                }
+            }
             _ => match value_str.parse::<f64>() {
                 Ok(v) => {
-                    if self.harmonograph.set_param(param, v) {
+                    if self.curve.shape.set_param(param, v) {
                         "ok\n".into()
                     } else {
                         format!("error: unknown param '{}'\n", param)
@@ -870,7 +910,7 @@ impl App {
     }
 
     fn cmd_restart(&mut self) -> String {
-        self.harmonograph.reset_time();
+        self.curve.reset_time();
         for (_wl, osurface) in &mut self.outputs {
             if let Some(os) = osurface {
                 if let Some(ref renderer) = os.renderer {
@@ -897,6 +937,27 @@ impl App {
     fn cmd_next_color(&mut self) -> String {
         self.pick_new_color();
         "ok\n".into()
+    }
+
+    fn cmd_next_shape(&mut self) -> String {
+        let next = self.curve.shape.next_name().to_string();
+        self.curve.switch_shape(&next);
+        for (_wl, osurface) in &mut self.outputs {
+            if let Some(os) = osurface {
+                if let Some(ref renderer) = os.renderer {
+                    self.egl
+                        .make_current(
+                            self.egl_display,
+                            Some(os.egl_surface),
+                            Some(os.egl_surface),
+                            Some(self.egl_context),
+                        )
+                        .unwrap();
+                    unsafe { renderer.clear() };
+                }
+            }
+        }
+        format!("ok shape={}\n", next)
     }
 }
 
@@ -1130,10 +1191,35 @@ fn main() {
     let dither_scale = parse_env_f32("HARMONOGRAPH_DITHER_SCALE", 1.0).max(1.0);
     let frame_interval = Duration::from_millis((1000 / fps as u64).max(1));
 
+    // Shape selection: "random" (default) or a specific shape name
+    let shape_env = env::var("HARMONOGRAPH_SHAPE").unwrap_or_default();
+    let shape_lock: Option<String>;
+    let initial_shape = match shape_env.to_lowercase().as_str() {
+        "" | "random" => {
+            shape_lock = None;
+            shapes::Shape::random()
+        }
+        name => {
+            if let Some(s) = shapes::Shape::from_name(name) {
+                shape_lock = Some(name.to_string());
+                s
+            } else {
+                warn!(
+                    "Unknown shape '{}', using random. Available: {}",
+                    name,
+                    shapes::SHAPE_NAMES.join(", ")
+                );
+                shape_lock = None;
+                shapes::Shape::random()
+            }
+        }
+    };
+
     info!(
-        "Config: {}fps, speed={}, fade={}, line_width={}, alpha={}, dither={}/{}/{}",
+        "Config: {}fps, speed={}, fade={}, line_width={}, alpha={}, dither={}/{}/{}, shape={}",
         fps, steps_per_tick, fade_amount, line_width, line_alpha,
         dither_strength, dither_levels, dither_scale,
+        initial_shape.name(),
     );
 
     let control = match ControlSocket::bind() {
@@ -1157,7 +1243,8 @@ fn main() {
         egl_config,
         control,
         outputs: Vec::new(),
-        harmonograph: Harmonograph::new(),
+        curve: CurveDrawer::new(initial_shape),
+        shape_lock,
         fg_colors,
         bg_color,
         current_color,

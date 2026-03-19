@@ -25,8 +25,6 @@ pub struct Harmonograph {
     t: f64,
     max_t: f64,
     step: f64,
-    ring: [(f64, f64); 4],
-    ring_count: u32,
 }
 
 impl Harmonograph {
@@ -59,8 +57,6 @@ impl Harmonograph {
             t: 0.0,
             max_t: 400.0,
             step: 0.01,
-            ring: [(0.0, 0.0); 4],
-            ring_count: 0,
         };
         h.randomize();
         h
@@ -101,48 +97,26 @@ impl Harmonograph {
         self.y1 = pendulum(&mut rng, f_y, true);
         self.y2 = pendulum(&mut rng, f_y2, false);
         self.t = 0.0;
-        self.ring_count = 0;
     }
 
-    #[inline(always)]
-    fn eval(&self, t: f64) -> (f64, f64) {
-        (
-            self.x1.eval(t) + self.x2.eval(t),
-            self.y1.eval(t) + self.y2.eval(t),
-        )
+    pub fn reset(&mut self) {
+        self.t = 0.0;
     }
 
-    #[inline]
-    pub fn advance(&mut self) -> bool {
+    pub fn name() -> &'static str {
+        "harmonograph"
+    }
+
+    pub fn step(&mut self) -> Option<(f64, f64)> {
         if self.t > self.max_t {
-            return false;
+            return None;
         }
-        let pt = self.eval(self.t);
+        let x = self.x1.eval(self.t) + self.x2.eval(self.t);
+        let y = self.y1.eval(self.t) + self.y2.eval(self.t);
         self.t += self.step;
-
-        if self.ring_count >= 4 {
-            self.ring[0] = self.ring[1];
-            self.ring[1] = self.ring[2];
-            self.ring[2] = self.ring[3];
-            self.ring[3] = pt;
-        } else {
-            self.ring[self.ring_count as usize] = pt;
-        }
-        self.ring_count += 1;
-        true
+        Some((x, y))
     }
 
-    #[inline]
-    pub fn catmull_rom_points(&self) -> Option<&[(f64, f64); 4]> {
-        if self.ring_count >= 4 {
-            Some(&self.ring)
-        } else {
-            None
-        }
-    }
-
-    /// Get a pendulum parameter by dotted name (e.g. "x1.freq").
-    #[allow(dead_code)]
     pub fn get_param(&self, name: &str) -> Option<f64> {
         match name {
             "x1.freq" => Some(self.x1.frequency),
@@ -167,7 +141,6 @@ impl Harmonograph {
         }
     }
 
-    /// Set a pendulum parameter by dotted name. Returns true on success.
     pub fn set_param(&mut self, name: &str, value: f64) -> bool {
         match name {
             "x1.freq" => self.x1.frequency = value,
@@ -193,7 +166,6 @@ impl Harmonograph {
         true
     }
 
-    /// Return all pendulum + simulation parameters as (key, value) pairs.
     pub fn all_params(&self) -> Vec<(&'static str, f64)> {
         vec![
             ("x1.freq", self.x1.frequency),
@@ -215,78 +187,5 @@ impl Harmonograph {
             ("max_t", self.max_t),
             ("step", self.step),
         ]
-    }
-
-    /// Reset simulation time to zero without changing pendulum parameters.
-    pub fn reset_time(&mut self) {
-        self.t = 0.0;
-        self.ring_count = 0;
-    }
-
-    /// Append triangle-strip vertices for the current Catmull-Rom segment to `verts`.
-    ///
-    /// Coordinates are in normalized [-1, 1] NDC. `scale_x` and `scale_y` allow
-    /// aspect-ratio correction so the pattern is square regardless of screen
-    /// dimensions. By appending to an existing buffer the caller can accumulate
-    /// multiple simulation steps into a single continuous strip, eliminating
-    /// gaps at segment joints.
-    /// Append triangle-strip vertices for the current Catmull-Rom segment.
-    ///
-    /// Each vertex is `[x, y, cross]` where `cross` is +1.0 or -1.0 indicating
-    /// the side of the line center (used for shader-based edge antialiasing).
-    pub fn append_catmull_rom_strip(
-        &self,
-        scale_x: f64,
-        scale_y: f64,
-        line_width: f64,
-        n_subdivisions: usize,
-        verts: &mut Vec<[f32; 3]>,
-    ) -> bool {
-        let pts = match self.catmull_rom_points() {
-            Some(p) => p,
-            None => return false,
-        };
-
-        let p0 = (pts[0].0 * scale_x, pts[0].1 * scale_y);
-        let p1 = (pts[1].0 * scale_x, pts[1].1 * scale_y);
-        let p2 = (pts[2].0 * scale_x, pts[2].1 * scale_y);
-        let p3 = (pts[3].0 * scale_x, pts[3].1 * scale_y);
-
-        // Catmull-Rom → cubic Bezier control points
-        let c1 = (p1.0 + (p2.0 - p0.0) / 6.0, p1.1 + (p2.1 - p0.1) / 6.0);
-        let c2 = (p2.0 - (p3.0 - p1.0) / 6.0, p2.1 - (p3.1 - p1.1) / 6.0);
-
-        let hw = line_width * 0.5;
-
-        // When appending to an existing strip, skip t=0 because the previous
-        // segment already emitted those vertices (they share the same point).
-        let start = if verts.is_empty() { 0 } else { 1 };
-
-        for i in start..=n_subdivisions {
-            let t = i as f64 / n_subdivisions as f64;
-            let mt = 1.0 - t;
-            let mt2 = mt * mt;
-            let t2 = t * t;
-            let x = mt2 * mt * p1.0 + 3.0 * mt2 * t * c1.0 + 3.0 * mt * t2 * c2.0 + t2 * t * p2.0;
-            let y = mt2 * mt * p1.1 + 3.0 * mt2 * t * c1.1 + 3.0 * mt * t2 * c2.1 + t2 * t * p2.1;
-
-            // Tangent for normal computation
-            let dx = -3.0 * mt2 * p1.0
-                + 3.0 * (mt2 - 2.0 * mt * t) * c1.0
-                + 3.0 * (2.0 * mt * t - t2) * c2.0
-                + 3.0 * t2 * p2.0;
-            let dy = -3.0 * mt2 * p1.1
-                + 3.0 * (mt2 - 2.0 * mt * t) * c1.1
-                + 3.0 * (2.0 * mt * t - t2) * c2.1
-                + 3.0 * t2 * p2.1;
-            let len = (dx * dx + dy * dy).sqrt().max(1e-10);
-            let nx = -dy / len * hw;
-            let ny = dx / len * hw;
-
-            verts.push([(x + nx) as f32, (y + ny) as f32, 1.0]);
-            verts.push([(x - nx) as f32, (y - ny) as f32, -1.0]);
-        }
-
-        true
     }
 }
