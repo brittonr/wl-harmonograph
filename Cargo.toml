@@ -3,6 +3,14 @@ name = "wl-harmonograph"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "wl-harmonograph"
+path = "src/main.rs"
+
+[[bin]]
+name = "wl-harmonograph-ctl"
+path = "src/bin/ctl.rs"
+
 [dependencies]
 smithay-client-toolkit = { version = "0.20", default-features = false, features = ["calloop"] }
 wayland-client = "0.31"
@@ -17,3 +25,8 @@ env_logger = "0.10"
 khronos-egl = { version = "6", features = ["static"] }
 wayland-egl = "0.32"
 glow = "0.16"
+
+# TUI for wl-harmonograph-ctl
+ratatui = "0.30"
+crossterm = { version = "0.29", features = ["event-stream"] }
+rat-widgets = { git = "https://github.com/brittonr/subwayrat.git", branch = "main" }

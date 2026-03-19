@@ -20,6 +20,7 @@
 
             src = ./.;
 
+            # Update after changing dependencies: nix build 2>&1 | grep 'got:'
             cargoHash = "sha256-jvCq3NQBIoK0ZctDeTeFi9eXIi7mbZYDF6RoiWCk7JY=";
 
             nativeBuildInputs = with pkgs; [
@@ -39,6 +40,7 @@
                 pkgs.libglvnd
                 pkgs.mesa
               ]} $out/bin/wl-harmonograph
+              # wl-harmonograph-ctl doesn't need GL rpath
             '';
 
             meta = with pkgs.lib; {

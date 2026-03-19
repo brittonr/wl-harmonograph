@@ -6,17 +6,20 @@
 //! Each frame the CPU only computes 3 pendulum positions and submits 3
 //! triangle-strip draw calls — all rasterization happens on the GPU.
 
+mod control;
 mod harmonograph;
 
 use std::env;
+use std::io::Write;
 use std::time::Duration;
 
 use calloop::timer::{TimeoutAction, Timer};
 use calloop::EventLoop;
 use calloop_wayland_source::WaylandSource;
+use control::ControlSocket;
 use glow::HasContext;
 use harmonograph::Harmonograph;
-use log::info;
+use log::{info, warn};
 use rand::Rng;
 use smithay_client_toolkit::compositor::{CompositorHandler, CompositorState};
 use smithay_client_toolkit::output::{OutputHandler, OutputState};
@@ -84,6 +87,27 @@ fn colors_from_env() -> (Vec<Color>, Color) {
     (fg, bg)
 }
 
+fn parse_env_f32(name: &str, default: f32) -> f32 {
+    env::var(name)
+        .ok()
+        .and_then(|s| s.trim().parse::<f32>().ok())
+        .unwrap_or(default)
+}
+
+fn parse_env_f64(name: &str, default: f64) -> f64 {
+    env::var(name)
+        .ok()
+        .and_then(|s| s.trim().parse::<f64>().ok())
+        .unwrap_or(default)
+}
+
+fn parse_env_u32(name: &str, default: u32) -> u32 {
+    env::var(name)
+        .ok()
+        .and_then(|s| s.trim().parse::<u32>().ok())
+        .unwrap_or(default)
+}
+
 // ---------------------------------------------------------------------------
 // GL renderer
 // ---------------------------------------------------------------------------
@@ -102,6 +126,10 @@ struct GlRenderer {
     a_cross: u32,
     width: u32,
     height: u32,
+    u_dither_strength: glow::UniformLocation,
+    u_dither_levels: glow::UniformLocation,
+    u_dither_scale: glow::UniformLocation,
+    u_resolution: glow::UniformLocation,
 }
 
 impl GlRenderer {
@@ -148,13 +176,47 @@ impl GlRenderer {
             varying vec2 v_uv;
             uniform sampler2D u_tex;
             uniform vec3 u_bg;
+            uniform float u_dither_strength;
+            uniform float u_dither_levels;
+            uniform float u_dither_scale;
+            uniform vec2 u_resolution;
+
+            // 8x8 ordered (Bayer) dithering threshold via recursive quadrant
+            // decomposition. Returns a value in [0, 1).
+            float bayer8(vec2 coord) {
+                vec2 p = mod(floor(coord), 8.0);
+                float value = 0.0;
+                float size = 4.0;
+                for (int i = 0; i < 3; i++) {
+                    vec2 h = step(size, p);
+                    p = mod(p, size);
+                    value = value * 4.0 + 2.0 * h.x + 3.0 * h.y - 4.0 * h.x * h.y;
+                    size *= 0.5;
+                }
+                return value / 64.0;
+            }
+
             void main() {
                 vec4 texel = texture2D(u_tex, v_uv);
-                gl_FragColor = vec4(mix(u_bg, texel.rgb, texel.a), 1.0);
+                vec3 color = mix(u_bg, texel.rgb, texel.a);
+
+                if (u_dither_strength > 0.0) {
+                    vec2 fragCoord = v_uv * u_resolution / u_dither_scale;
+                    float threshold = bayer8(fragCoord);
+                    float levels = max(u_dither_levels, 2.0);
+                    vec3 quantized = floor(color * (levels - 1.0) + threshold) / (levels - 1.0);
+                    color = mix(color, clamp(quantized, 0.0, 1.0), u_dither_strength);
+                }
+
+                gl_FragColor = vec4(color, 1.0);
             }
         "#;
         let blit_program = Self::create_program(&gl, blit_vs, blit_fs);
         let u_bg = gl.get_uniform_location(blit_program, "u_bg").unwrap();
+        let u_dither_strength = gl.get_uniform_location(blit_program, "u_dither_strength").unwrap();
+        let u_dither_levels = gl.get_uniform_location(blit_program, "u_dither_levels").unwrap();
+        let u_dither_scale = gl.get_uniform_location(blit_program, "u_dither_scale").unwrap();
+        let u_resolution = gl.get_uniform_location(blit_program, "u_resolution").unwrap();
 
         // VBO for line strips
         let vbo = gl.create_buffer().unwrap();
@@ -193,6 +255,10 @@ impl GlRenderer {
             a_cross,
             width,
             height,
+            u_dither_strength,
+            u_dither_levels,
+            u_dither_scale,
+            u_resolution,
         }
     }
 
@@ -354,7 +420,13 @@ impl GlRenderer {
     }
 
     /// Blit the FBO texture to the default framebuffer, compositing over bg.
-    unsafe fn blit_to_screen(&self, bg: Color) {
+    unsafe fn blit_to_screen(
+        &self,
+        bg: Color,
+        dither_strength: f32,
+        dither_levels: f32,
+        dither_scale: f32,
+    ) {
         let gl = &self.gl;
         gl.bind_framebuffer(glow::FRAMEBUFFER, None);
         gl.viewport(0, 0, self.width as i32, self.height as i32);
@@ -362,6 +434,10 @@ impl GlRenderer {
         gl.disable(glow::BLEND);
         gl.use_program(Some(self.blit_program));
         gl.uniform_3_f32(Some(&self.u_bg), bg.0 as f32, bg.1 as f32, bg.2 as f32);
+        gl.uniform_1_f32(Some(&self.u_dither_strength), dither_strength);
+        gl.uniform_1_f32(Some(&self.u_dither_levels), dither_levels);
+        gl.uniform_1_f32(Some(&self.u_dither_scale), dither_scale);
+        gl.uniform_2_f32(Some(&self.u_resolution), self.width as f32, self.height as f32);
 
         gl.active_texture(glow::TEXTURE0);
         gl.bind_texture(glow::TEXTURE_2D, Some(self.fbo_texture));
@@ -429,12 +505,19 @@ struct App {
     egl_context: khronos_egl::Context,
     egl_config: khronos_egl::Config,
 
+    control: Option<ControlSocket>,
     outputs: Vec<(wl_output::WlOutput, Option<OutputSurface>)>,
     harmonograph: Harmonograph,
     fg_colors: Vec<Color>,
     bg_color: Color,
     current_color: Color,
     steps_per_tick: u32,
+    fade_amount: f32,
+    line_width: f64,
+    line_alpha: f32,
+    dither_strength: f32,
+    dither_levels: f32,
+    dither_scale: f32,
     /// Per-axis NDC scale factors to keep the pattern square.
     /// Computed from the first configured output's dimensions.
     scale_x: f64,
@@ -478,6 +561,7 @@ impl App {
     }
 
     fn tick(&mut self) {
+        self.poll_control();
         let color = self.current_color;
         let bg = self.bg_color;
         let steps = self.steps_per_tick;
@@ -519,10 +603,10 @@ impl App {
                         )
                         .unwrap();
                     unsafe {
-                        renderer.fade(0.005);
+                        renderer.fade(self.fade_amount);
                         if draw {
-                            // ~2px line in NDC for this output's resolution
-                            let line_width = 12.0 / os.height.min(os.width) as f64;
+                            let line_width =
+                                self.line_width * 6.0 / os.height.min(os.width) as f64;
                             verts.clear();
                             self.harmonograph.append_catmull_rom_strip(
                                 self.scale_x,
@@ -532,10 +616,15 @@ impl App {
                                 &mut verts,
                             );
                             if !verts.is_empty() {
-                                renderer.draw_strip(&verts, color, 0.85);
+                                renderer.draw_strip(&verts, color, self.line_alpha);
                             }
                         }
-                        renderer.blit_to_screen(bg);
+                        renderer.blit_to_screen(
+                            bg,
+                            self.dither_strength,
+                            self.dither_levels,
+                            self.dither_scale,
+                        );
                     }
                     self.egl
                         .swap_buffers(self.egl_display, os.egl_surface)
@@ -682,6 +771,132 @@ impl App {
                 self.scale_x, self.scale_y, max_w, max_h
             );
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // Control socket
+    // -----------------------------------------------------------------------
+
+    fn poll_control(&mut self) {
+        let control = match self.control.take() {
+            Some(c) => c,
+            None => return,
+        };
+        let pending = control.collect_pending();
+        self.control = Some(control);
+
+        for (cmd, mut stream) in pending {
+            let response = self.handle_command(&cmd);
+            let _ = stream.write_all(response.as_bytes());
+        }
+    }
+
+    fn handle_command(&mut self, cmd: &str) -> String {
+        let parts: Vec<&str> = cmd.splitn(3, ' ').collect();
+        match parts.first().copied() {
+            Some("get") => self.cmd_get(),
+            Some("set") if parts.len() >= 3 => self.cmd_set(parts[1], parts[2]),
+            Some("set") => "error: usage: set <param> <value>\n".into(),
+            Some("restart") => self.cmd_restart(),
+            Some("randomize") => self.cmd_randomize(),
+            Some("next-color") => self.cmd_next_color(),
+            _ => format!("error: unknown command '{}'\n", cmd),
+        }
+    }
+
+    fn cmd_get(&self) -> String {
+        let mut out = String::new();
+        out.push_str(&format!("line_width={}\n", self.line_width));
+        out.push_str(&format!("alpha={}\n", self.line_alpha));
+        out.push_str(&format!("fade={}\n", self.fade_amount));
+        out.push_str(&format!("speed={}\n", self.steps_per_tick));
+        out.push_str(&format!("dither={}\n", self.dither_strength));
+        out.push_str(&format!("dither_levels={}\n", self.dither_levels));
+        out.push_str(&format!("dither_scale={}\n", self.dither_scale));
+        out.push_str(&format!(
+            "bg={},{},{}\n",
+            self.bg_color.0, self.bg_color.1, self.bg_color.2
+        ));
+        out.push_str(&format!(
+            "color={},{},{}\n",
+            self.current_color.0, self.current_color.1, self.current_color.2
+        ));
+        for (name, val) in self.harmonograph.all_params() {
+            out.push_str(&format!("{}={}\n", name, val));
+        }
+        out
+    }
+
+    fn cmd_set(&mut self, param: &str, value_str: &str) -> String {
+        macro_rules! parse_set {
+            ($field:expr, $ty:ty, $min:expr, $max:expr) => {
+                match value_str.parse::<$ty>() {
+                    Ok(v) => {
+                        $field = v.clamp($min, $max);
+                        return "ok\n".into();
+                    }
+                    Err(_) => return "error: invalid value\n".into(),
+                }
+            };
+        }
+
+        match param {
+            "line_width" => parse_set!(self.line_width, f64, 0.5, 50.0),
+            "alpha" => parse_set!(self.line_alpha, f32, 0.01, 1.0),
+            "fade" => parse_set!(self.fade_amount, f32, 0.0, 1.0),
+            "speed" => parse_set!(self.steps_per_tick, u32, 1, 100),
+            "dither" => parse_set!(self.dither_strength, f32, 0.0, 1.0),
+            "dither_levels" => parse_set!(self.dither_levels, f32, 2.0, 256.0),
+            "dither_scale" => parse_set!(self.dither_scale, f32, 1.0, 16.0),
+            "bg" => {
+                if let Some(c) = parse_hex_color(value_str) {
+                    self.bg_color = c;
+                    "ok\n".into()
+                } else {
+                    "error: invalid hex color\n".into()
+                }
+            }
+            _ => match value_str.parse::<f64>() {
+                Ok(v) => {
+                    if self.harmonograph.set_param(param, v) {
+                        "ok\n".into()
+                    } else {
+                        format!("error: unknown param '{}'\n", param)
+                    }
+                }
+                Err(_) => "error: invalid value\n".into(),
+            },
+        }
+    }
+
+    fn cmd_restart(&mut self) -> String {
+        self.harmonograph.reset_time();
+        for (_wl, osurface) in &mut self.outputs {
+            if let Some(os) = osurface {
+                if let Some(ref renderer) = os.renderer {
+                    self.egl
+                        .make_current(
+                            self.egl_display,
+                            Some(os.egl_surface),
+                            Some(os.egl_surface),
+                            Some(self.egl_context),
+                        )
+                        .unwrap();
+                    unsafe { renderer.clear() };
+                }
+            }
+        }
+        "ok\n".into()
+    }
+
+    fn cmd_randomize(&mut self) -> String {
+        self.restart();
+        "ok\n".into()
+    }
+
+    fn cmd_next_color(&mut self) -> String {
+        self.pick_new_color();
+        "ok\n".into()
     }
 }
 
@@ -905,6 +1120,30 @@ fn main() {
     let mut rng = rand::thread_rng();
     let current_color = fg_colors[rng.gen_range(0..fg_colors.len())];
 
+    let steps_per_tick = parse_env_u32("HARMONOGRAPH_SPEED", 1).max(1);
+    let fps = parse_env_u32("HARMONOGRAPH_FPS", 30).clamp(1, 144);
+    let fade_amount = parse_env_f32("HARMONOGRAPH_FADE", 0.005).max(0.0);
+    let line_width = parse_env_f64("HARMONOGRAPH_LINE_WIDTH", 2.0).max(0.5);
+    let line_alpha = parse_env_f32("HARMONOGRAPH_ALPHA", 0.85).clamp(0.01, 1.0);
+    let dither_strength = parse_env_f32("HARMONOGRAPH_DITHER", 0.0).clamp(0.0, 1.0);
+    let dither_levels = parse_env_f32("HARMONOGRAPH_DITHER_LEVELS", 8.0).clamp(2.0, 256.0);
+    let dither_scale = parse_env_f32("HARMONOGRAPH_DITHER_SCALE", 1.0).max(1.0);
+    let frame_interval = Duration::from_millis((1000 / fps as u64).max(1));
+
+    info!(
+        "Config: {}fps, speed={}, fade={}, line_width={}, alpha={}, dither={}/{}/{}",
+        fps, steps_per_tick, fade_amount, line_width, line_alpha,
+        dither_strength, dither_levels, dither_scale,
+    );
+
+    let control = match ControlSocket::bind() {
+        Ok(c) => Some(c),
+        Err(e) => {
+            warn!("Could not open control socket: {}", e);
+            None
+        }
+    };
+
     let mut app = App {
         registry_state,
         output_state,
@@ -916,12 +1155,19 @@ fn main() {
         egl_display,
         egl_context,
         egl_config,
+        control,
         outputs: Vec::new(),
         harmonograph: Harmonograph::new(),
         fg_colors,
         bg_color,
         current_color,
-        steps_per_tick: 1,
+        steps_per_tick,
+        fade_amount,
+        line_width,
+        line_alpha,
+        dither_strength,
+        dither_levels,
+        dither_scale,
         scale_x: 0.4,
         scale_y: 0.4,
     };
@@ -935,13 +1181,12 @@ fn main() {
         .insert(loop_handle.clone())
         .expect("insert wayland source");
 
-    // ~30fps × 1 step/tick = 30 steps/sec (matches original Python pacing)
     loop_handle
         .insert_source(
-            Timer::from_duration(Duration::from_millis(33)),
-            |_, _, app| {
+            Timer::from_duration(frame_interval),
+            move |_, _, app| {
                 app.tick();
-                TimeoutAction::ToDuration(Duration::from_millis(33))
+                TimeoutAction::ToDuration(frame_interval)
             },
         )
         .expect("insert timer");

@@ -141,6 +141,88 @@ impl Harmonograph {
         }
     }
 
+    /// Get a pendulum parameter by dotted name (e.g. "x1.freq").
+    #[allow(dead_code)]
+    pub fn get_param(&self, name: &str) -> Option<f64> {
+        match name {
+            "x1.freq" => Some(self.x1.frequency),
+            "x1.amp" => Some(self.x1.amplitude),
+            "x1.phase" => Some(self.x1.phase),
+            "x1.damping" => Some(self.x1.damping),
+            "x2.freq" => Some(self.x2.frequency),
+            "x2.amp" => Some(self.x2.amplitude),
+            "x2.phase" => Some(self.x2.phase),
+            "x2.damping" => Some(self.x2.damping),
+            "y1.freq" => Some(self.y1.frequency),
+            "y1.amp" => Some(self.y1.amplitude),
+            "y1.phase" => Some(self.y1.phase),
+            "y1.damping" => Some(self.y1.damping),
+            "y2.freq" => Some(self.y2.frequency),
+            "y2.amp" => Some(self.y2.amplitude),
+            "y2.phase" => Some(self.y2.phase),
+            "y2.damping" => Some(self.y2.damping),
+            "max_t" => Some(self.max_t),
+            "step" => Some(self.step),
+            _ => None,
+        }
+    }
+
+    /// Set a pendulum parameter by dotted name. Returns true on success.
+    pub fn set_param(&mut self, name: &str, value: f64) -> bool {
+        match name {
+            "x1.freq" => self.x1.frequency = value,
+            "x1.amp" => self.x1.amplitude = value,
+            "x1.phase" => self.x1.phase = value,
+            "x1.damping" => self.x1.damping = value,
+            "x2.freq" => self.x2.frequency = value,
+            "x2.amp" => self.x2.amplitude = value,
+            "x2.phase" => self.x2.phase = value,
+            "x2.damping" => self.x2.damping = value,
+            "y1.freq" => self.y1.frequency = value,
+            "y1.amp" => self.y1.amplitude = value,
+            "y1.phase" => self.y1.phase = value,
+            "y1.damping" => self.y1.damping = value,
+            "y2.freq" => self.y2.frequency = value,
+            "y2.amp" => self.y2.amplitude = value,
+            "y2.phase" => self.y2.phase = value,
+            "y2.damping" => self.y2.damping = value,
+            "max_t" => self.max_t = value,
+            "step" => self.step = value,
+            _ => return false,
+        }
+        true
+    }
+
+    /// Return all pendulum + simulation parameters as (key, value) pairs.
+    pub fn all_params(&self) -> Vec<(&'static str, f64)> {
+        vec![
+            ("x1.freq", self.x1.frequency),
+            ("x1.amp", self.x1.amplitude),
+            ("x1.phase", self.x1.phase),
+            ("x1.damping", self.x1.damping),
+            ("x2.freq", self.x2.frequency),
+            ("x2.amp", self.x2.amplitude),
+            ("x2.phase", self.x2.phase),
+            ("x2.damping", self.x2.damping),
+            ("y1.freq", self.y1.frequency),
+            ("y1.amp", self.y1.amplitude),
+            ("y1.phase", self.y1.phase),
+            ("y1.damping", self.y1.damping),
+            ("y2.freq", self.y2.frequency),
+            ("y2.amp", self.y2.amplitude),
+            ("y2.phase", self.y2.phase),
+            ("y2.damping", self.y2.damping),
+            ("max_t", self.max_t),
+            ("step", self.step),
+        ]
+    }
+
+    /// Reset simulation time to zero without changing pendulum parameters.
+    pub fn reset_time(&mut self) {
+        self.t = 0.0;
+        self.ring_count = 0;
+    }
+
     /// Append triangle-strip vertices for the current Catmull-Rom segment to `verts`.
     ///
     /// Coordinates are in normalized [-1, 1] NDC. `scale_x` and `scale_y` allow
