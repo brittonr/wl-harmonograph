@@ -55,6 +55,10 @@
             meta.mainProgram = "wl-harmonograph-ctl";
           });
 
+          wl-harmonograph-ascii = wl-harmonograph.overrideAttrs (_: {
+            meta.mainProgram = "wl-harmonograph-ascii";
+          });
+
           default = wl-harmonograph;
         });
     };

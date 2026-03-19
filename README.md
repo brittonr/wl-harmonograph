@@ -30,6 +30,23 @@ Eight shape types are available:
   <img src="https://github.com/user-attachments/assets/a0058140-5458-46e5-a5ae-8ae9ffd65737" width="30%" />
 </p>
 
+## ASCII Mode
+
+A standalone terminal renderer draws the same patterns as density-mapped
+ASCII art — no Wayland or GPU required. Each cell accumulates intensity as
+curves pass through it and maps to a character ramp (` .,:;=!*#$@`).
+
+```bash
+wl-harmonograph-ascii                              # random shape
+HARMONOGRAPH_SHAPE=wireframe wl-harmonograph-ascii  # specific shape
+```
+
+Keys: `r` randomize, `s` next shape, `c` next color, `space` restart, `q` quit.
+
+Reads the same `HARMONOGRAPH_*` env vars. Speed defaults to 50 (steps per
+frame) since each step plots a single point rather than a GPU-interpolated
+segment.
+
 ## Architecture
 
 GPU-accelerated rendering using EGL + OpenGL ES 2.0 on top of
