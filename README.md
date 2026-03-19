@@ -11,7 +11,7 @@ When a pattern finishes, the screen clears and a new one begins with fresh
 random parameters, a different color, and potentially a different shape,
 resulting in a unique wallpaper on every restart.
 
-Six shape types are available:
+Eight shape types are available:
 
 | Shape | Description |
 |---|---|
@@ -21,6 +21,8 @@ Six shape types are available:
 | **rose** | Polar flower curves with optional compound petals |
 | **butterfly** | Temple Fay's butterfly curve (1989) |
 | **lorenz** | Lorenz strange attractor — chaotic double-spiral |
+| **wireframe** | Rotating 3D Platonic solids (cube, icosahedron, …) |
+| **torusknot** | 3D torus knots — curves wound around a torus |
 
 <p align="center">
   <img src="https://github.com/user-attachments/assets/c6d704e0-d39b-4620-974b-209fdba3255a" width="30%" />

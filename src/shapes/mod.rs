@@ -4,6 +4,8 @@ pub mod lissajous;
 pub mod lorenz;
 pub mod rose;
 pub mod spirograph;
+pub mod torusknot;
+pub mod wireframe;
 
 use rand::Rng;
 
@@ -13,6 +15,8 @@ use lissajous::Lissajous;
 use lorenz::Lorenz;
 use rose::Rose;
 use spirograph::Spirograph;
+use torusknot::TorusKnot;
+use wireframe::Wireframe;
 
 /// Names of all available shapes (order matches enum discriminant).
 pub const SHAPE_NAMES: &[&str] = &[
@@ -22,6 +26,8 @@ pub const SHAPE_NAMES: &[&str] = &[
     "rose",
     "butterfly",
     "lorenz",
+    "wireframe",
+    "torusknot",
 ];
 
 pub enum Shape {
@@ -31,6 +37,8 @@ pub enum Shape {
     Rose(Rose),
     Butterfly(Butterfly),
     Lorenz(Lorenz),
+    Wireframe(Wireframe),
+    TorusKnot(TorusKnot),
 }
 
 macro_rules! dispatch {
@@ -42,6 +50,8 @@ macro_rules! dispatch {
             Shape::Rose(s) => s.$method(),
             Shape::Butterfly(s) => s.$method(),
             Shape::Lorenz(s) => s.$method(),
+            Shape::Wireframe(s) => s.$method(),
+            Shape::TorusKnot(s) => s.$method(),
         }
     };
     ($self:expr, $method:ident, $($arg:expr),+) => {
@@ -52,6 +62,8 @@ macro_rules! dispatch {
             Shape::Rose(s) => s.$method($($arg),+),
             Shape::Butterfly(s) => s.$method($($arg),+),
             Shape::Lorenz(s) => s.$method($($arg),+),
+            Shape::Wireframe(s) => s.$method($($arg),+),
+            Shape::TorusKnot(s) => s.$method($($arg),+),
         }
     };
 }
@@ -66,6 +78,8 @@ impl Shape {
             "rose" => Some(Shape::Rose(Rose::new())),
             "butterfly" => Some(Shape::Butterfly(Butterfly::new())),
             "lorenz" => Some(Shape::Lorenz(Lorenz::new())),
+            "wireframe" => Some(Shape::Wireframe(Wireframe::new())),
+            "torusknot" => Some(Shape::TorusKnot(TorusKnot::new())),
             _ => None,
         }
     }
@@ -85,6 +99,8 @@ impl Shape {
             Shape::Rose(_) => Rose::name(),
             Shape::Butterfly(_) => Butterfly::name(),
             Shape::Lorenz(_) => Lorenz::name(),
+            Shape::Wireframe(_) => Wireframe::name(),
+            Shape::TorusKnot(_) => TorusKnot::name(),
         }
     }
 

@@ -126,6 +126,23 @@ fn param_spec(key: &str) -> (f64, f64, f64, f64, usize) {
         "lorenz.beta" => (0.1, 10.0, 0.2, 0.05, 2),
         "lorenz.dt" => (0.001, 0.02, 0.001, 0.0001, 4),
         "lorenz.max_steps" => (1000.0, 200000.0, 5000.0, 1000.0, 0),
+        // Wireframe
+        k if k.starts_with("wire.rot_") => (-0.01, 0.01, 0.0005, 0.0001, 4),
+        "wire.perspective" => (1.5, 8.0, 0.5, 0.1, 1),
+        "wire.scale" => (0.5, 4.0, 0.2, 0.05, 2),
+        "wire.damping" => (0.0, 0.0002, 0.00001, 0.000002, 5),
+        "wire.steps_per_edge" => (10.0, 200.0, 10.0, 5.0, 0),
+        "wire.max_steps" => (5000.0, 200000.0, 5000.0, 1000.0, 0),
+        // Torus knot
+        "knot.p" | "knot.q" => (1.0, 12.0, 1.0, 1.0, 0),
+        "knot.big_r" => (0.3, 2.0, 0.1, 0.02, 2),
+        "knot.small_r" => (0.05, 1.0, 0.05, 0.01, 2),
+        k if k.starts_with("knot.rot_") => (-0.01, 0.01, 0.0005, 0.0001, 4),
+        "knot.perspective" => (1.5, 8.0, 0.5, 0.1, 1),
+        "knot.scale" => (0.5, 3.0, 0.1, 0.02, 2),
+        "knot.damping" => (0.0, 0.0002, 0.00001, 0.000002, 5),
+        "knot.dt" => (0.001, 0.05, 0.002, 0.0005, 3),
+        "knot.max_t" => (20.0, 500.0, 20.0, 5.0, 0),
         // Common
         "max_t" => (10.0, 2000.0, 50.0, 10.0, 0),
         "step" => (0.001, 0.1, 0.005, 0.001, 3),
@@ -175,6 +192,12 @@ fn param_label(key: &str) -> String {
                 "Wing freq" => "Wing Freq".into(),
                 "Tail freq" => "Tail Freq".into(),
                 "Max steps" => "Max Steps".into(),
+                "Rot x" | "Rot X" => "Rotation X".into(),
+                "Rot y" | "Rot Y" => "Rotation Y".into(),
+                "Rot z" | "Rot Z" => "Rotation Z".into(),
+                "Steps per edge" => "Steps/Edge".into(),
+                "P" => "Winding P".into(),
+                "Q" => "Winding Q".into(),
                 _ => label,
             }
         }
@@ -195,6 +218,8 @@ fn section_name(prefix: &str) -> String {
         "rose" => "Rose".into(),
         "bfly" => "Butterfly".into(),
         "lorenz" => "Lorenz".into(),
+        "wire" => "Wireframe".into(),
+        "knot" => "Torus Knot".into(),
         "sim" => "Simulation".into(),
         _ => prefix.to_string(),
     }
