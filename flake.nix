@@ -13,8 +13,8 @@
       packages = forAllSystems (system:
         let
           pkgs = nixpkgsFor.${system};
-        in {
-          default = pkgs.rustPlatform.buildRustPackage {
+        in rec {
+          wl-harmonograph = pkgs.rustPlatform.buildRustPackage {
             pname = "wl-harmonograph";
             inherit version;
 
@@ -50,6 +50,12 @@
               mainProgram = "wl-harmonograph";
             };
           };
+
+          wl-harmonograph-ctl = wl-harmonograph.overrideAttrs (_: {
+            meta.mainProgram = "wl-harmonograph-ctl";
+          });
+
+          default = wl-harmonograph;
         });
     };
 }
