@@ -1,4 +1,4 @@
-use std::f64::consts::PI;
+use std::f64::consts::{PI, TAU};
 
 use rand::Rng;
 use super::Shape;
@@ -64,7 +64,7 @@ impl Shape for Lissajous {
         let (a, b) = pairs[rng.gen_range(0..pairs.len())];
         self.freq_a = a + rng.gen_range(-0.02..0.02);
         self.freq_b = b + rng.gen_range(-0.02..0.02);
-        self.delta = rng.gen_range(0.0..2.0 * PI);
+        self.delta = rng.gen_range(0.0..TAU);
         self.damping = rng.gen_range(0.002..0.006);
         self.t = 0.0;
     }

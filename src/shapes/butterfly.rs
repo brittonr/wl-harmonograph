@@ -3,6 +3,9 @@ use std::f64::consts::PI;
 use rand::Rng;
 use super::Shape;
 
+/// Maximum radius of the raw butterfly curve (~e^1 + 2 + 1 ≈ 4.3, padded).
+const MAX_RADIUS: f64 = 4.5;
+
 /// Temple H. Fay's butterfly curve (1989).
 ///
 ///   r(θ) = e^sin(θ) − 2·cos(4θ) + sin⁵((2θ − π) / 24)
@@ -78,7 +81,7 @@ impl Shape for Butterfly {
             + ((2.0 * self.t - PI) / self.tail_freq).sin().powi(5);
 
         // Raw max r ≈ 4.3, normalize to ~1.0
-        let scale = self.amplitude / 4.5;
+        let scale = self.amplitude / MAX_RADIUS;
         let r = r * scale * decay;
         let x = r * self.t.cos();
         let y = r * self.t.sin();

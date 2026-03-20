@@ -17,6 +17,7 @@ pub mod wireframe;
 use rand::Rng;
 
 use butterfly::Butterfly;
+
 use clifford::Clifford;
 use dejong::DeJong;
 use dopendulum::DoPendulum;
@@ -64,6 +65,11 @@ pub trait Shape {
     fn randomize(&mut self);
     
     /// Reset the shape's time/iteration state without changing parameters.
+    ///
+    /// For deterministic shapes (harmonograph, spirograph, lissajous, etc.)
+    /// this simply rewinds the time counter. For chaotic systems (lorenz,
+    /// rossler, clifford, etc.) this may also pick new initial conditions,
+    /// since different starting points produce visually distinct trajectories.
     fn reset(&mut self);
     
     /// Get a parameter value by name.
@@ -113,6 +119,30 @@ pub fn next_shape_name(current: &str) -> &'static str {
 }
 
 // ---------------------------------------------------------------------------
+// Shared 3D helpers
+// ---------------------------------------------------------------------------
+
+/// Rotate a 3D point around X, Y, and Z axes (extrinsic Euler rotation).
+pub fn rotate_xyz(p: [f64; 3], angle_x: f64, angle_y: f64, angle_z: f64) -> [f64; 3] {
+    let (sx, cx) = angle_x.sin_cos();
+    let (sy, cy) = angle_y.sin_cos();
+    let (sz, cz) = angle_z.sin_cos();
+    let [x, y, z] = p;
+
+    // Rx
+    let (x1, y1, z1) = (x, cx * y - sx * z, sx * y + cx * z);
+    // Ry
+    let (x2, y2, z2) = (cy * x1 + sy * z1, y1, -sy * x1 + cy * z1);
+    // Rz
+    [cz * x2 - sz * y2, sz * x2 + cz * y2, z2]
+}
+
+/// Random sign: +1.0 or -1.0 with equal probability.
+pub fn random_sign(rng: &mut impl Rng) -> f64 {
+    if rng.gen_bool(0.5) { 1.0 } else { -1.0 }
+}
+
+// ---------------------------------------------------------------------------
 // CurveDrawer — ring buffer + catmull-rom + triangle strip generation
 // ---------------------------------------------------------------------------
 
@@ -129,10 +159,6 @@ impl CurveDrawer {
             ring: [(0.0, 0.0); 4],
             ring_count: 0,
         }
-    }
-
-    pub fn new_random() -> Self {
-        Self::new(random_shape())
     }
 
     /// Advance the shape by one step, feeding the point into the ring buffer.

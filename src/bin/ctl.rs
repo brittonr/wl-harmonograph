@@ -12,7 +12,7 @@
 //!   wl-harmonograph-ctl next-color          # cycle color
 //!   wl-harmonograph-ctl next-shape          # cycle shape
 
-use std::collections::HashMap;
+use std::f64::consts::TAU;
 use std::io::{self, Read, Write as _};
 use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
@@ -103,7 +103,7 @@ fn param_spec(key: &str) -> (f64, f64, f64, f64, usize) {
         // Harmonograph pendulum params
         k if k.ends_with(".freq") => (0.1, 16.0, 0.1, 0.01, 3),
         k if k.ends_with(".amp") || k.ends_with(".amplitude") => (0.0, 2.0, 0.05, 0.01, 3),
-        k if k.ends_with(".phase") => (0.0, 6.283, 0.1, 0.01, 3),
+        k if k.ends_with(".phase") => (0.0, TAU, 0.1, 0.01, 3),
         k if k.ends_with(".damping") => (0.0, 0.05, 0.001, 0.0001, 4),
         // Spirograph
         "spiro.big_r" => (0.1, 3.0, 0.1, 0.01, 3),
@@ -112,7 +112,7 @@ fn param_spec(key: &str) -> (f64, f64, f64, f64, usize) {
         "spiro.inner" => (0.0, 1.0, 1.0, 1.0, 0),
         // Lissajous
         "liss.freq_a" | "liss.freq_b" => (0.1, 16.0, 0.1, 0.01, 3),
-        "liss.delta" => (0.0, 6.283, 0.1, 0.01, 3),
+        "liss.delta" => (0.0, TAU, 0.1, 0.01, 3),
         // Rose
         "rose.k" => (0.1, 12.0, 0.1, 0.01, 3),
         "rose.k2" => (0.0, 12.0, 0.5, 0.1, 3),
@@ -159,7 +159,7 @@ fn param_spec(key: &str) -> (f64, f64, f64, f64, usize) {
         "guil.r0" => (0.1, 1.0, 0.05, 0.01, 2),
         k if k.starts_with("guil.amp") => (0.0, 0.5, 0.02, 0.005, 3),
         k if k.starts_with("guil.freq") => (1.0, 60.0, 1.0, 0.1, 1),
-        k if k.starts_with("guil.phase") => (0.0, 6.283, 0.1, 0.01, 3),
+        k if k.starts_with("guil.phase") => (0.0, TAU, 0.1, 0.01, 3),
         // Double pendulum
         "dpend.l1" | "dpend.l2" => (0.1, 0.9, 0.05, 0.01, 2),
         "dpend.m2" => (0.1, 5.0, 0.2, 0.05, 2),
@@ -425,26 +425,6 @@ fn build_params_from_daemon() -> Option<(String, Vec<Param>, Vec<Section>)> {
     }
 
     Some((shape, params, sections))
-}
-
-/// Refresh param values from the daemon without rebuilding the list.
-#[allow(dead_code)]
-fn refresh_values(params: &mut [Param]) {
-    if let Ok(resp) = send_command("get") {
-        let mut map = HashMap::new();
-        for line in resp.lines() {
-            if let Some((key, val_str)) = line.split_once('=') {
-                if let Ok(v) = val_str.parse::<f64>() {
-                    map.insert(key.to_string(), v);
-                }
-            }
-        }
-        for p in params.iter_mut() {
-            if let Some(&v) = map.get(&p.key) {
-                p.value = v;
-            }
-        }
-    }
 }
 
 // ---------------------------------------------------------------------------

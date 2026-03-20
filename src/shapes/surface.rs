@@ -62,17 +62,6 @@ const SURFACE_KINDS: &[SurfaceKind] = &[
 ];
 
 impl SurfaceKind {
-    fn _label(self) -> &'static str {
-        match self {
-            SurfaceKind::Torus => "torus",
-            SurfaceKind::Sphere => "sphere",
-            SurfaceKind::Cylinder => "cylinder",
-            SurfaceKind::Cone => "cone",
-            SurfaceKind::Mobius => "mobius",
-            SurfaceKind::Spring => "spring",
-        }
-    }
-
     fn from_index(i: usize) -> Self {
         SURFACE_KINDS[i % SURFACE_KINDS.len()]
     }
@@ -185,17 +174,6 @@ impl Surface {
         }
     }
 
-    fn rotate(&self, p: [f64; 3]) -> [f64; 3] {
-        let (sx, cx) = self.angle_x.sin_cos();
-        let (sy, cy) = self.angle_y.sin_cos();
-        let (sz, cz) = self.angle_z.sin_cos();
-        let [x, y, z] = p;
-
-        let (x1, y1, z1) = (x, cx * y - sx * z, sx * y + cx * z);
-        let (x2, y2, z2) = (cy * x1 + sy * z1, y1, -sy * x1 + cy * z1);
-        [cz * x2 - sz * y2, sz * x2 + cz * y2, z2]
-    }
-
     fn project(&self, p: [f64; 3]) -> (f64, f64) {
         let s = self.perspective / (self.perspective + p[2]);
         (p[0] * s * self.output_scale, p[1] * s * self.output_scale)
@@ -260,7 +238,7 @@ impl Shape for Surface {
         }
 
         let p = self.surface_point(self.t);
-        let rotated = self.rotate(p);
+        let rotated = super::rotate_xyz(p, self.angle_x, self.angle_y, self.angle_z);
         let (px, py) = self.project(rotated);
 
         self.t += self.dt;
@@ -282,10 +260,9 @@ impl Shape for Surface {
         self.angle_y = rng.gen_range(0.0..TAU);
         self.angle_z = rng.gen_range(0.0..TAU);
 
-        let sign = |rng: &mut rand::rngs::ThreadRng| if rng.gen_bool(0.5) { 1.0 } else { -1.0 };
-        self.rot_speed_x = rng.gen_range(0.0008..0.003) * sign(&mut rng);
-        self.rot_speed_y = rng.gen_range(0.0008..0.003) * sign(&mut rng);
-        self.rot_speed_z = rng.gen_range(0.0003..0.0015) * sign(&mut rng);
+        self.rot_speed_x = rng.gen_range(0.0008..0.003) * super::random_sign(&mut rng);
+        self.rot_speed_y = rng.gen_range(0.0008..0.003) * super::random_sign(&mut rng);
+        self.rot_speed_z = rng.gen_range(0.0003..0.0015) * super::random_sign(&mut rng);
 
         self.perspective = rng.gen_range(2.5..5.0);
 

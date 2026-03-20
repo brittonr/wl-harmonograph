@@ -1,4 +1,4 @@
-use std::f64::consts::{PI, TAU};
+use std::f64::consts::TAU;
 
 use rand::Rng;
 use super::Shape;
@@ -84,7 +84,7 @@ impl Shape for Guilloche {
 
         // Run long enough for the pattern to develop and fade
         let max_freq = self.freq1.max(self.freq2).max(self.freq3);
-        self.max_t = max_freq * PI * 2.0 + 300.0;
+        self.max_t = max_freq * TAU + 300.0;
     }
 
     fn reset(&mut self) {

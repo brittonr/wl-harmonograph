@@ -125,15 +125,8 @@ impl Shape for TorusKnot {
         self.angle_x = rng.gen_range(0.0..std::f64::consts::TAU);
         self.angle_y = rng.gen_range(0.0..std::f64::consts::TAU);
 
-        let sign = |rng: &mut rand::rngs::ThreadRng| {
-            if rng.gen_bool(0.5) {
-                1.0
-            } else {
-                -1.0
-            }
-        };
-        self.rot_speed_x = rng.gen_range(0.0005..0.003) * sign(&mut rng);
-        self.rot_speed_y = rng.gen_range(0.0005..0.003) * sign(&mut rng);
+        self.rot_speed_x = rng.gen_range(0.0005..0.003) * super::random_sign(&mut rng);
+        self.rot_speed_y = rng.gen_range(0.0005..0.003) * super::random_sign(&mut rng);
 
         self.perspective = rng.gen_range(3.0..5.0);
         self.output_scale = rng.gen_range(1.2..1.6);

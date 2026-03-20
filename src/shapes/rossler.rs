@@ -1,6 +1,11 @@
 use rand::Rng;
 use super::Shape;
 
+/// Bounding box estimates for the attractor's xy extent.
+/// The spread depends on parameter `c` — higher c makes wider excursions.
+const SCALE_HIGH_C: f64 = 15.0;
+const SCALE_LOW_C: f64 = 10.0;
+
 /// Rössler attractor — Otto Rössler's chaotic system (1976).
 ///
 ///   dx/dt = -y - z
@@ -119,7 +124,7 @@ impl Shape for Rossler {
 
         // The attractor extends roughly x∈[-12,12], y∈[-12,12] depending
         // on c. Scale adaptively based on c.
-        let scale = if self.c > 6.0 { 15.0 } else { 10.0 };
+        let scale = if self.c > 6.0 { SCALE_HIGH_C } else { SCALE_LOW_C };
         let px = self.x / scale;
         let py = self.y / scale;
         Some((px, py))

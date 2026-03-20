@@ -18,8 +18,8 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 use ratatui::Terminal;
 
-use crate::shapes::{self, Shape, SHAPE_NAMES};
-use crate::{colors_from_env, parse_env_f32, parse_env_u32, Color};
+use crate::shapes::{self, Shape};
+use crate::{colors_from_env, parse_env_f32, parse_env_u32, pick_random_color, resolve_shape_env, Color};
 
 /// ASCII density ramp from empty to full.
 const RAMP: &[char] = &[' ', '.', ',', ':', ';', '=', '!', '*', '#', '$', '@'];
@@ -36,21 +36,7 @@ pub fn run() {
     let fade = parse_env_f32("HARMONOGRAPH_FADE", 0.03);
     let steps = parse_env_u32("HARMONOGRAPH_SPEED", 50).max(1);
 
-    let shape_env = std::env::var("HARMONOGRAPH_SHAPE").unwrap_or_default();
-    let (shape_lock, initial_shape) = match shape_env.to_lowercase().as_str() {
-        "" | "random" => (None, shapes::random_shape()),
-        name => match shapes::shape_from_name(name) {
-            Some(s) => (Some(name.to_string()), s),
-            None => {
-                eprintln!(
-                    "unknown shape '{}', using random (available: {})",
-                    name,
-                    SHAPE_NAMES.join(", ")
-                );
-                (None, shapes::random_shape())
-            }
-        },
-    };
+    let (shape_lock, initial_shape) = resolve_shape_env();
 
     if let Err(e) = terminal::enable_raw_mode() {
         eprintln!("error: requires a terminal ({})", e);
@@ -178,18 +164,7 @@ impl AsciiApp {
     }
 
     fn pick_color(&mut self) {
-        let mut rng = rand::thread_rng();
-        if self.fg_colors.len() <= 1 {
-            self.current_color = self.fg_colors[0];
-            return;
-        }
-        loop {
-            let c = self.fg_colors[rng.gen_range(0..self.fg_colors.len())];
-            if c != self.current_color {
-                self.current_color = c;
-                return;
-            }
-        }
+        self.current_color = pick_random_color(&self.fg_colors, self.current_color);
     }
 
     fn restart(&mut self) {

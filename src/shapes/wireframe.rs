@@ -74,20 +74,6 @@ impl Wireframe {
         self.vertices = verts;
     }
 
-    fn rotate(&self, p: [f64; 3]) -> [f64; 3] {
-        let (sx, cx) = self.angle_x.sin_cos();
-        let (sy, cy) = self.angle_y.sin_cos();
-        let (sz, cz) = self.angle_z.sin_cos();
-        let [x, y, z] = p;
-
-        // Rx
-        let (x1, y1, z1) = (x, cx * y - sx * z, sx * y + cx * z);
-        // Ry
-        let (x2, y2, z2) = (cy * x1 + sy * z1, y1, -sy * x1 + cy * z1);
-        // Rz
-        [cz * x2 - sz * y2, sz * x2 + cz * y2, z2]
-    }
-
     fn project(&self, p: [f64; 3]) -> (f64, f64) {
         let s = self.perspective / (self.perspective + p[2]);
         (p[0] * s, p[1] * s)
@@ -116,16 +102,9 @@ impl Shape for Wireframe {
         self.angle_y = rng.gen_range(0.0..std::f64::consts::TAU);
         self.angle_z = rng.gen_range(0.0..std::f64::consts::TAU);
 
-        let sign = |rng: &mut rand::rngs::ThreadRng| {
-            if rng.gen_bool(0.5) {
-                1.0
-            } else {
-                -1.0
-            }
-        };
-        self.rot_speed_x = rng.gen_range(0.0005..0.003) * sign(&mut rng);
-        self.rot_speed_y = rng.gen_range(0.0005..0.003) * sign(&mut rng);
-        self.rot_speed_z = rng.gen_range(0.0003..0.002) * sign(&mut rng);
+        self.rot_speed_x = rng.gen_range(0.0005..0.003) * super::random_sign(&mut rng);
+        self.rot_speed_y = rng.gen_range(0.0005..0.003) * super::random_sign(&mut rng);
+        self.rot_speed_z = rng.gen_range(0.0003..0.002) * super::random_sign(&mut rng);
 
         self.perspective = rng.gen_range(2.5..4.0);
         self.output_scale = rng.gen_range(1.8..2.5);
@@ -161,7 +140,7 @@ impl Shape for Wireframe {
             v0[2] + (v1[2] - v0[2]) * frac,
         ];
 
-        let rotated = self.rotate(p);
+        let rotated = super::rotate_xyz(p, self.angle_x, self.angle_y, self.angle_z);
         let (px, py) = self.project(rotated);
         let decay = (-self.damping * self.total_steps as f64).exp();
 
@@ -429,7 +408,7 @@ fn build_edge_path(n: usize, edges: &[(usize, usize)]) -> Vec<usize> {
     }
 
     // Close loop back to start for smooth wrapping
-    if path.len() > 1 && *path.last().unwrap() != path[0] {
+    if path.len() > 1 && path.last() != Some(&path[0]) {
         path.push(path[0]);
     }
 

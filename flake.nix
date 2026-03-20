@@ -55,11 +55,6 @@
             meta.mainProgram = "wl-harmonograph-ctl";
           });
 
-          wl-harmonograph-ascii = wl-harmonograph.overrideAttrs (_: {
-            meta.mainProgram = "wl-harmonograph-ascii";
-            meta.description = "ASCII terminal mode (also available via wl-harmonograph --ascii)";
-          });
-
           noctalia-plugin = pkgs.stdenvNoCC.mkDerivation {
             pname = "wl-harmonograph-noctalia-plugin";
             inherit version;

@@ -1,4 +1,4 @@
-use std::f64::consts::PI;
+use std::f64::consts::TAU;
 
 use rand::Rng;
 
@@ -98,7 +98,7 @@ impl Shape for Harmonograph {
                     rng.gen_range(0.1..0.35)
                 },
                 frequency: freq,
-                phase: rng.gen_range(0.0..2.0 * PI),
+                phase: rng.gen_range(0.0..TAU),
                 damping: rng.gen_range(0.002..0.006),
             }
         };

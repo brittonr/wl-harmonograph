@@ -22,7 +22,7 @@ use control::ControlSocket;
 use glow::HasContext;
 use log::{info, warn};
 use wl_harmonograph::shapes::{self, CurveDrawer};
-use wl_harmonograph::{Color, colors_from_env, parse_env_f32, parse_env_f64, parse_env_u32, parse_hex_color};
+use wl_harmonograph::{Color, colors_from_env, parse_env_f32, parse_env_f64, parse_env_u32, parse_hex_color, pick_random_color, resolve_shape_env};
 use rand::Rng;
 use smithay_client_toolkit::compositor::{CompositorHandler, CompositorState};
 use smithay_client_toolkit::output::{OutputHandler, OutputState};
@@ -491,18 +491,7 @@ impl App {
     }
 
     fn pick_new_color(&mut self) {
-        let mut rng = rand::thread_rng();
-        if self.fg_colors.len() <= 1 {
-            self.current_color = self.fg_colors[0];
-            return;
-        }
-        loop {
-            let c = self.fg_colors[rng.gen_range(0..self.fg_colors.len())];
-            if c != self.current_color {
-                self.current_color = c;
-                return;
-            }
-        }
+        self.current_color = pick_random_color(&self.fg_colors, self.current_color);
     }
 
     fn restart(&mut self) {
@@ -766,25 +755,20 @@ impl App {
     }
 
     fn cmd_get(&self) -> String {
+        use std::fmt::Write as _;
         let mut out = String::new();
-        out.push_str(&format!("shape={}\n", self.curve.shape.name()));
-        out.push_str(&format!("line_width={}\n", self.line_width));
-        out.push_str(&format!("alpha={}\n", self.line_alpha));
-        out.push_str(&format!("fade={}\n", self.fade_amount));
-        out.push_str(&format!("speed={}\n", self.steps_per_tick));
-        out.push_str(&format!("dither={}\n", self.dither_strength));
-        out.push_str(&format!("dither_levels={}\n", self.dither_levels));
-        out.push_str(&format!("dither_scale={}\n", self.dither_scale));
-        out.push_str(&format!(
-            "bg={},{},{}\n",
-            self.bg_color.0, self.bg_color.1, self.bg_color.2
-        ));
-        out.push_str(&format!(
-            "color={},{},{}\n",
-            self.current_color.0, self.current_color.1, self.current_color.2
-        ));
+        let _ = writeln!(out, "shape={}", self.curve.shape.name());
+        let _ = writeln!(out, "line_width={}", self.line_width);
+        let _ = writeln!(out, "alpha={}", self.line_alpha);
+        let _ = writeln!(out, "fade={}", self.fade_amount);
+        let _ = writeln!(out, "speed={}", self.steps_per_tick);
+        let _ = writeln!(out, "dither={}", self.dither_strength);
+        let _ = writeln!(out, "dither_levels={}", self.dither_levels);
+        let _ = writeln!(out, "dither_scale={}", self.dither_scale);
+        let _ = writeln!(out, "bg={},{},{}", self.bg_color.0, self.bg_color.1, self.bg_color.2);
+        let _ = writeln!(out, "color={},{},{}", self.current_color.0, self.current_color.1, self.current_color.2);
         for (name, val) in self.curve.shape.all_params() {
-            out.push_str(&format!("{}={}\n", name, val));
+            let _ = writeln!(out, "{}={}", name, val);
         }
         out
     }
@@ -1131,29 +1115,7 @@ fn run_wayland() {
     let dither_scale = parse_env_f32("HARMONOGRAPH_DITHER_SCALE", 1.0).max(1.0);
     let frame_interval = Duration::from_millis((1000 / fps as u64).max(1));
 
-    // Shape selection: "random" (default) or a specific shape name
-    let shape_env = env::var("HARMONOGRAPH_SHAPE").unwrap_or_default();
-    let shape_lock: Option<String>;
-    let initial_shape = match shape_env.to_lowercase().as_str() {
-        "" | "random" => {
-            shape_lock = None;
-            shapes::random_shape()
-        }
-        name => {
-            if let Some(s) = shapes::shape_from_name(name) {
-                shape_lock = Some(name.to_string());
-                s
-            } else {
-                warn!(
-                    "Unknown shape '{}', using random. Available: {}",
-                    name,
-                    shapes::SHAPE_NAMES.join(", ")
-                );
-                shape_lock = None;
-                shapes::random_shape()
-            }
-        }
-    };
+    let (shape_lock, initial_shape) = resolve_shape_env();
 
     info!(
         "Config: {}fps, speed={}, fade={}, line_width={}, alpha={}, dither={}/{}/{}, shape={}",

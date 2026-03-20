@@ -1,6 +1,9 @@
 use rand::Rng;
 use super::Shape;
 
+/// Bounding box estimate: the attractor fits within ~[-25, 25] on x and z.
+const ATTRACTOR_SCALE: f64 = 25.0;
+
 /// Lorenz strange attractor — Edward Lorenz's chaotic system (1963).
 ///
 ///   dx/dt = σ (y − x)
@@ -128,8 +131,8 @@ impl Shape for Lorenz {
         self.steps_done += 1;
 
         // Project to 2D: use (x, z-center) view, scaled to ~[-1, 1]
-        let px = self.x / 25.0;
-        let py = (self.z - 25.0) / 25.0;
+        let px = self.x / ATTRACTOR_SCALE;
+        let py = (self.z - ATTRACTOR_SCALE) / ATTRACTOR_SCALE;
         Some((px, py))
     }
 

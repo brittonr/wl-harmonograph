@@ -3,7 +3,46 @@ pub mod shapes;
 
 use std::env;
 
+use rand::Rng;
+
 pub type Color = (f64, f64, f64);
+
+/// Pick a random color from the palette, different from `current` if possible.
+///
+/// Bounded to avoid spinning forever on palettes with all-identical entries.
+pub fn pick_random_color(palette: &[Color], current: Color) -> Color {
+    if palette.len() <= 1 {
+        return palette[0];
+    }
+    let mut rng = rand::thread_rng();
+    for _ in 0..100 {
+        let c = palette[rng.gen_range(0..palette.len())];
+        if c != current {
+            return c;
+        }
+    }
+    palette[rng.gen_range(0..palette.len())]
+}
+
+/// Resolve the `HARMONOGRAPH_SHAPE` env var into an initial shape and
+/// optional lock name (Some = locked to that shape type on restart).
+pub fn resolve_shape_env() -> (Option<String>, Box<dyn shapes::Shape>) {
+    let shape_env = env::var("HARMONOGRAPH_SHAPE").unwrap_or_default();
+    match shape_env.to_lowercase().as_str() {
+        "" | "random" => (None, shapes::random_shape()),
+        name => match shapes::shape_from_name(name) {
+            Some(s) => (Some(name.to_string()), s),
+            None => {
+                eprintln!(
+                    "Unknown shape '{}', using random. Available: {}",
+                    name,
+                    shapes::SHAPE_NAMES.join(", ")
+                );
+                (None, shapes::random_shape())
+            }
+        },
+    }
+}
 
 pub fn parse_hex_color(hex: &str) -> Option<Color> {
     let hex = hex.trim().trim_start_matches('#');

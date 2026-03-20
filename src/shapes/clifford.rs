@@ -1,6 +1,9 @@
 use rand::Rng;
 use super::Shape;
 
+/// Bounding box estimate: the attractor fits within ~[-2.5, 2.5] on each axis.
+const ATTRACTOR_SCALE: f64 = 2.5;
+
 /// Clifford attractor — a 2D iterated map that produces swirling,
 /// feathery structures from four parameters.
 ///
@@ -97,7 +100,7 @@ impl Shape for Clifford {
         self.steps_done += 1;
 
         // The attractor fits roughly in [-2.5, 2.5]; scale to [-1, 1]
-        Some((self.x / 2.5, self.y / 2.5))
+        Some((self.x / ATTRACTOR_SCALE, self.y / ATTRACTOR_SCALE))
     }
 
     fn get_param(&self, name: &str) -> Option<f64> {

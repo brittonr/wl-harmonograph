@@ -1,6 +1,9 @@
 use rand::Rng;
 use super::Shape;
 
+/// Bounding box estimate: output bounded in [-2, 2] on each axis.
+const ATTRACTOR_SCALE: f64 = 2.0;
+
 /// De Jong attractor — Peter de Jong's iterated 2D map.
 ///
 ///   x_{n+1} = sin(a * y_n) - cos(b * x_n)
@@ -92,7 +95,7 @@ impl Shape for DeJong {
         self.steps_done += 1;
 
         // Output bounded in [-2, 2]; scale to [-1, 1]
-        Some((self.x / 2.0, self.y / 2.0))
+        Some((self.x / ATTRACTOR_SCALE, self.y / ATTRACTOR_SCALE))
     }
 
     fn get_param(&self, name: &str) -> Option<f64> {
