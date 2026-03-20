@@ -1,4 +1,5 @@
 use rand::Rng;
+use super::Shape;
 
 /// De Jong attractor — Peter de Jong's iterated 2D map.
 ///
@@ -33,8 +34,11 @@ impl DeJong {
         s.randomize();
         s
     }
+}
 
-    pub fn randomize(&mut self) {
+impl Shape for DeJong {
+
+    fn randomize(&mut self) {
         let mut rng = rand::thread_rng();
 
         let presets: &[(f64, f64, f64, f64)] = &[
@@ -65,18 +69,18 @@ impl DeJong {
         self.steps_done = 0;
     }
 
-    pub fn reset(&mut self) {
+    fn reset(&mut self) {
         let mut rng = rand::thread_rng();
         self.x = rng.gen_range(-0.1..0.1);
         self.y = rng.gen_range(-0.1..0.1);
         self.steps_done = 0;
     }
 
-    pub fn name() -> &'static str {
+    fn name(&self) -> &'static str {
         "dejong"
     }
 
-    pub fn step(&mut self) -> Option<(f64, f64)> {
+    fn step(&mut self) -> Option<(f64, f64)> {
         if self.steps_done >= self.max_steps {
             return None;
         }
@@ -91,7 +95,7 @@ impl DeJong {
         Some((self.x / 2.0, self.y / 2.0))
     }
 
-    pub fn get_param(&self, name: &str) -> Option<f64> {
+    fn get_param(&self, name: &str) -> Option<f64> {
         match name {
             "dj.a" => Some(self.a),
             "dj.b" => Some(self.b),
@@ -102,7 +106,7 @@ impl DeJong {
         }
     }
 
-    pub fn set_param(&mut self, name: &str, value: f64) -> bool {
+    fn set_param(&mut self, name: &str, value: f64) -> bool {
         match name {
             "dj.a" => self.a = value,
             "dj.b" => self.b = value,
@@ -114,7 +118,7 @@ impl DeJong {
         true
     }
 
-    pub fn all_params(&self) -> Vec<(&'static str, f64)> {
+    fn all_params(&self) -> Vec<(&'static str, f64)> {
         vec![
             ("dj.a", self.a),
             ("dj.b", self.b),

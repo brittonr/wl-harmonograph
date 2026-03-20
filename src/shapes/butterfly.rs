@@ -1,6 +1,7 @@
 use std::f64::consts::PI;
 
 use rand::Rng;
+use super::Shape;
 
 /// Temple H. Fay's butterfly curve (1989).
 ///
@@ -38,8 +39,11 @@ impl Butterfly {
         b.randomize();
         b
     }
+}
 
-    pub fn randomize(&mut self) {
+impl Shape for Butterfly {
+
+    fn randomize(&mut self) {
         let mut rng = rand::thread_rng();
 
         // The classic curve uses wing_freq=4, tail_freq=24.
@@ -55,15 +59,15 @@ impl Butterfly {
         self.max_t = 24.0 * PI + 100.0;
     }
 
-    pub fn reset(&mut self) {
+    fn reset(&mut self) {
         self.t = 0.0;
     }
 
-    pub fn name() -> &'static str {
+    fn name(&self) -> &'static str {
         "butterfly"
     }
 
-    pub fn step(&mut self) -> Option<(f64, f64)> {
+    fn step(&mut self) -> Option<(f64, f64)> {
         if self.t > self.max_t {
             return None;
         }
@@ -82,7 +86,7 @@ impl Butterfly {
         Some((x, y))
     }
 
-    pub fn get_param(&self, name: &str) -> Option<f64> {
+    fn get_param(&self, name: &str) -> Option<f64> {
         match name {
             "bfly.wing_freq" => Some(self.wing_freq),
             "bfly.tail_freq" => Some(self.tail_freq),
@@ -94,7 +98,7 @@ impl Butterfly {
         }
     }
 
-    pub fn set_param(&mut self, name: &str, value: f64) -> bool {
+    fn set_param(&mut self, name: &str, value: f64) -> bool {
         match name {
             "bfly.wing_freq" => self.wing_freq = value,
             "bfly.tail_freq" => self.tail_freq = value,
@@ -107,7 +111,7 @@ impl Butterfly {
         true
     }
 
-    pub fn all_params(&self) -> Vec<(&'static str, f64)> {
+    fn all_params(&self) -> Vec<(&'static str, f64)> {
         vec![
             ("bfly.wing_freq", self.wing_freq),
             ("bfly.tail_freq", self.tail_freq),

@@ -1,6 +1,7 @@
 use std::f64::consts::{PI, TAU};
 
 use rand::Rng;
+use super::Shape;
 
 /// Guilloché patterns — the intricate engraving found on banknotes,
 /// certificates, and watch dials.
@@ -51,8 +52,11 @@ impl Guilloche {
         g.randomize();
         g
     }
+}
 
-    pub fn randomize(&mut self) {
+impl Shape for Guilloche {
+
+    fn randomize(&mut self) {
         let mut rng = rand::thread_rng();
 
         self.r0 = rng.gen_range(0.3..0.7);
@@ -83,15 +87,15 @@ impl Guilloche {
         self.max_t = max_freq * PI * 2.0 + 300.0;
     }
 
-    pub fn reset(&mut self) {
+    fn reset(&mut self) {
         self.t = 0.0;
     }
 
-    pub fn name() -> &'static str {
+    fn name(&self) -> &'static str {
         "guilloche"
     }
 
-    pub fn step(&mut self) -> Option<(f64, f64)> {
+    fn step(&mut self) -> Option<(f64, f64)> {
         if self.t > self.max_t {
             return None;
         }
@@ -109,7 +113,7 @@ impl Guilloche {
         Some((x, y))
     }
 
-    pub fn get_param(&self, name: &str) -> Option<f64> {
+    fn get_param(&self, name: &str) -> Option<f64> {
         match name {
             "guil.r0" => Some(self.r0),
             "guil.amp1" => Some(self.amp1),
@@ -128,7 +132,7 @@ impl Guilloche {
         }
     }
 
-    pub fn set_param(&mut self, name: &str, value: f64) -> bool {
+    fn set_param(&mut self, name: &str, value: f64) -> bool {
         match name {
             "guil.r0" => self.r0 = value,
             "guil.amp1" => self.amp1 = value,
@@ -148,7 +152,7 @@ impl Guilloche {
         true
     }
 
-    pub fn all_params(&self) -> Vec<(&'static str, f64)> {
+    fn all_params(&self) -> Vec<(&'static str, f64)> {
         vec![
             ("guil.r0", self.r0),
             ("guil.amp1", self.amp1),

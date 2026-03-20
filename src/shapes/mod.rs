@@ -32,7 +32,7 @@ use surface::Surface;
 use torusknot::TorusKnot;
 use wireframe::Wireframe;
 
-/// Names of all available shapes (order matches enum discriminant).
+/// Names of all available shapes (order matches creation order).
 pub const SHAPE_NAMES: &[&str] = &[
     "harmonograph",
     "spirograph",
@@ -51,147 +51,65 @@ pub const SHAPE_NAMES: &[&str] = &[
     "surface",
 ];
 
-pub enum Shape {
-    Harmonograph(Harmonograph),
-    Spirograph(Spirograph),
-    Lissajous(Lissajous),
-    Rose(Rose),
-    Butterfly(Butterfly),
-    Lorenz(Lorenz),
-    Wireframe(Wireframe),
-    TorusKnot(TorusKnot),
-    Clifford(Clifford),
-    DeJong(DeJong),
-    Superformula(Superformula),
-    Guilloche(Guilloche),
-    DoPendulum(DoPendulum),
-    Rossler(Rossler),
-    Surface(Surface),
+/// Shape trait for all parametric curve generators.
+pub trait Shape {
+    /// Get the shape's name.
+    fn name(&self) -> &'static str;
+    
+    /// Advance to the next point in the curve.
+    /// Returns None when the curve is finished.
+    fn step(&mut self) -> Option<(f64, f64)>;
+    
+    /// Randomize the shape's parameters.
+    fn randomize(&mut self);
+    
+    /// Reset the shape's time/iteration state without changing parameters.
+    fn reset(&mut self);
+    
+    /// Get a parameter value by name.
+    fn get_param(&self, name: &str) -> Option<f64>;
+    
+    /// Set a parameter value by name.
+    /// Returns true if the parameter was found and set.
+    fn set_param(&mut self, name: &str, value: f64) -> bool;
+    
+    /// Get all parameters as (name, value) pairs.
+    fn all_params(&self) -> Vec<(&'static str, f64)>;
 }
 
-macro_rules! dispatch {
-    ($self:expr, $method:ident) => {
-        match $self {
-            Shape::Harmonograph(s) => s.$method(),
-            Shape::Spirograph(s) => s.$method(),
-            Shape::Lissajous(s) => s.$method(),
-            Shape::Rose(s) => s.$method(),
-            Shape::Butterfly(s) => s.$method(),
-            Shape::Lorenz(s) => s.$method(),
-            Shape::Wireframe(s) => s.$method(),
-            Shape::TorusKnot(s) => s.$method(),
-            Shape::Clifford(s) => s.$method(),
-            Shape::DeJong(s) => s.$method(),
-            Shape::Superformula(s) => s.$method(),
-            Shape::Guilloche(s) => s.$method(),
-            Shape::DoPendulum(s) => s.$method(),
-            Shape::Rossler(s) => s.$method(),
-            Shape::Surface(s) => s.$method(),
-        }
-    };
-    ($self:expr, $method:ident, $($arg:expr),+) => {
-        match $self {
-            Shape::Harmonograph(s) => s.$method($($arg),+),
-            Shape::Spirograph(s) => s.$method($($arg),+),
-            Shape::Lissajous(s) => s.$method($($arg),+),
-            Shape::Rose(s) => s.$method($($arg),+),
-            Shape::Butterfly(s) => s.$method($($arg),+),
-            Shape::Lorenz(s) => s.$method($($arg),+),
-            Shape::Wireframe(s) => s.$method($($arg),+),
-            Shape::TorusKnot(s) => s.$method($($arg),+),
-            Shape::Clifford(s) => s.$method($($arg),+),
-            Shape::DeJong(s) => s.$method($($arg),+),
-            Shape::Superformula(s) => s.$method($($arg),+),
-            Shape::Guilloche(s) => s.$method($($arg),+),
-            Shape::DoPendulum(s) => s.$method($($arg),+),
-            Shape::Rossler(s) => s.$method($($arg),+),
-            Shape::Surface(s) => s.$method($($arg),+),
-        }
-    };
+/// Create a new shape by name. Returns None if the name is unknown.
+pub fn shape_from_name(name: &str) -> Option<Box<dyn Shape>> {
+    match name {
+        "harmonograph" => Some(Box::new(Harmonograph::new())),
+        "spirograph" => Some(Box::new(Spirograph::new())),
+        "lissajous" => Some(Box::new(Lissajous::new())),
+        "rose" => Some(Box::new(Rose::new())),
+        "butterfly" => Some(Box::new(Butterfly::new())),
+        "lorenz" => Some(Box::new(Lorenz::new())),
+        "wireframe" => Some(Box::new(Wireframe::new())),
+        "torusknot" => Some(Box::new(TorusKnot::new())),
+        "clifford" => Some(Box::new(Clifford::new())),
+        "dejong" => Some(Box::new(DeJong::new())),
+        "superformula" => Some(Box::new(Superformula::new())),
+        "guilloche" => Some(Box::new(Guilloche::new())),
+        "dopendulum" => Some(Box::new(DoPendulum::new())),
+        "rossler" => Some(Box::new(Rossler::new())),
+        "surface" => Some(Box::new(Surface::new())),
+        _ => None,
+    }
 }
 
-impl Shape {
-    /// Create a new shape by name. Returns None if the name is unknown.
-    pub fn from_name(name: &str) -> Option<Self> {
-        match name {
-            "harmonograph" => Some(Shape::Harmonograph(Harmonograph::new())),
-            "spirograph" => Some(Shape::Spirograph(Spirograph::new())),
-            "lissajous" => Some(Shape::Lissajous(Lissajous::new())),
-            "rose" => Some(Shape::Rose(Rose::new())),
-            "butterfly" => Some(Shape::Butterfly(Butterfly::new())),
-            "lorenz" => Some(Shape::Lorenz(Lorenz::new())),
-            "wireframe" => Some(Shape::Wireframe(Wireframe::new())),
-            "torusknot" => Some(Shape::TorusKnot(TorusKnot::new())),
-            "clifford" => Some(Shape::Clifford(Clifford::new())),
-            "dejong" => Some(Shape::DeJong(DeJong::new())),
-            "superformula" => Some(Shape::Superformula(Superformula::new())),
-            "guilloche" => Some(Shape::Guilloche(Guilloche::new())),
-            "dopendulum" => Some(Shape::DoPendulum(DoPendulum::new())),
-            "rossler" => Some(Shape::Rossler(Rossler::new())),
-            "surface" => Some(Shape::Surface(Surface::new())),
-            _ => None,
-        }
-    }
+/// Create a random shape.
+pub fn random_shape() -> Box<dyn Shape> {
+    let mut rng = rand::thread_rng();
+    let name = SHAPE_NAMES[rng.gen_range(0..SHAPE_NAMES.len())];
+    shape_from_name(name).unwrap()
+}
 
-    /// Create a random shape.
-    pub fn random() -> Self {
-        let mut rng = rand::thread_rng();
-        let name = SHAPE_NAMES[rng.gen_range(0..SHAPE_NAMES.len())];
-        Self::from_name(name).unwrap()
-    }
-
-    pub fn name(&self) -> &'static str {
-        match self {
-            Shape::Harmonograph(_) => Harmonograph::name(),
-            Shape::Spirograph(_) => Spirograph::name(),
-            Shape::Lissajous(_) => Lissajous::name(),
-            Shape::Rose(_) => Rose::name(),
-            Shape::Butterfly(_) => Butterfly::name(),
-            Shape::Lorenz(_) => Lorenz::name(),
-            Shape::Wireframe(_) => Wireframe::name(),
-            Shape::TorusKnot(_) => TorusKnot::name(),
-            Shape::Clifford(_) => Clifford::name(),
-            Shape::DeJong(_) => DeJong::name(),
-            Shape::Superformula(_) => Superformula::name(),
-            Shape::Guilloche(_) => Guilloche::name(),
-            Shape::DoPendulum(_) => DoPendulum::name(),
-            Shape::Rossler(_) => Rossler::name(),
-            Shape::Surface(_) => Surface::name(),
-        }
-    }
-
-    /// Cycle to the next shape type (wraps around).
-    pub fn next_name(&self) -> &'static str {
-        let current = self.name();
-        let idx = SHAPE_NAMES.iter().position(|&n| n == current).unwrap_or(0);
-        SHAPE_NAMES[(idx + 1) % SHAPE_NAMES.len()]
-    }
-
-    pub fn step(&mut self) -> Option<(f64, f64)> {
-        dispatch!(self, step)
-    }
-
-    #[allow(dead_code)]
-    pub fn randomize(&mut self) {
-        dispatch!(self, randomize)
-    }
-
-    pub fn reset(&mut self) {
-        dispatch!(self, reset)
-    }
-
-    #[allow(dead_code)]
-    pub fn get_param(&self, name: &str) -> Option<f64> {
-        dispatch!(self, get_param, name)
-    }
-
-    pub fn set_param(&mut self, name: &str, value: f64) -> bool {
-        dispatch!(self, set_param, name, value)
-    }
-
-    pub fn all_params(&self) -> Vec<(&'static str, f64)> {
-        dispatch!(self, all_params)
-    }
+/// Get the next shape name in the list (wraps around).
+pub fn next_shape_name(current: &str) -> &'static str {
+    let idx = SHAPE_NAMES.iter().position(|&n| n == current).unwrap_or(0);
+    SHAPE_NAMES[(idx + 1) % SHAPE_NAMES.len()]
 }
 
 // ---------------------------------------------------------------------------
@@ -199,13 +117,13 @@ impl Shape {
 // ---------------------------------------------------------------------------
 
 pub struct CurveDrawer {
-    pub shape: Shape,
+    pub shape: Box<dyn Shape>,
     ring: [(f64, f64); 4],
     ring_count: u32,
 }
 
 impl CurveDrawer {
-    pub fn new(shape: Shape) -> Self {
+    pub fn new(shape: Box<dyn Shape>) -> Self {
         Self {
             shape,
             ring: [(0.0, 0.0); 4],
@@ -213,9 +131,8 @@ impl CurveDrawer {
         }
     }
 
-    #[allow(dead_code)]
     pub fn new_random() -> Self {
-        Self::new(Shape::random())
+        Self::new(random_shape())
     }
 
     /// Advance the shape by one step, feeding the point into the ring buffer.
@@ -248,7 +165,6 @@ impl CurveDrawer {
     }
 
     /// Randomize the current shape (keeps same shape type).
-    #[allow(dead_code)]
     pub fn randomize(&mut self) {
         self.shape.randomize();
         self.ring_count = 0;
@@ -256,13 +172,13 @@ impl CurveDrawer {
 
     /// Switch to a completely new random shape.
     pub fn randomize_new_shape(&mut self) {
-        self.shape = Shape::random();
+        self.shape = random_shape();
         self.ring_count = 0;
     }
 
     /// Switch to a specific named shape with random params.
     pub fn switch_shape(&mut self, name: &str) -> bool {
-        match Shape::from_name(name) {
+        match shape_from_name(name) {
             Some(s) => {
                 self.shape = s;
                 self.ring_count = 0;

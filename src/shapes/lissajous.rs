@@ -1,6 +1,7 @@
 use std::f64::consts::PI;
 
 use rand::Rng;
+use super::Shape;
 
 /// Lissajous curves — two sinusoids with different frequencies.
 ///
@@ -38,8 +39,11 @@ impl Lissajous {
         l.randomize();
         l
     }
+}
 
-    pub fn randomize(&mut self) {
+impl Shape for Lissajous {
+
+    fn randomize(&mut self) {
         let mut rng = rand::thread_rng();
 
         // Pick from nice integer ratios, then detune slightly
@@ -65,15 +69,15 @@ impl Lissajous {
         self.t = 0.0;
     }
 
-    pub fn reset(&mut self) {
+    fn reset(&mut self) {
         self.t = 0.0;
     }
 
-    pub fn name() -> &'static str {
+    fn name(&self) -> &'static str {
         "lissajous"
     }
 
-    pub fn step(&mut self) -> Option<(f64, f64)> {
+    fn step(&mut self) -> Option<(f64, f64)> {
         if self.t > self.max_t {
             return None;
         }
@@ -84,7 +88,7 @@ impl Lissajous {
         Some((x, y))
     }
 
-    pub fn get_param(&self, name: &str) -> Option<f64> {
+    fn get_param(&self, name: &str) -> Option<f64> {
         match name {
             "liss.freq_a" => Some(self.freq_a),
             "liss.freq_b" => Some(self.freq_b),
@@ -96,7 +100,7 @@ impl Lissajous {
         }
     }
 
-    pub fn set_param(&mut self, name: &str, value: f64) -> bool {
+    fn set_param(&mut self, name: &str, value: f64) -> bool {
         match name {
             "liss.freq_a" => self.freq_a = value,
             "liss.freq_b" => self.freq_b = value,
@@ -109,7 +113,7 @@ impl Lissajous {
         true
     }
 
-    pub fn all_params(&self) -> Vec<(&'static str, f64)> {
+    fn all_params(&self) -> Vec<(&'static str, f64)> {
         vec![
             ("liss.freq_a", self.freq_a),
             ("liss.freq_b", self.freq_b),

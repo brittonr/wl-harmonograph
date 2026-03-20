@@ -1,4 +1,5 @@
 use rand::Rng;
+use super::Shape;
 
 /// Lorenz strange attractor — Edward Lorenz's chaotic system (1963).
 ///
@@ -46,38 +47,52 @@ impl Lorenz {
         l
     }
 
-    fn derivatives(&self, x: f64, y: f64, z: f64) -> (f64, f64, f64) {
-        (
-            self.sigma * (y - x),
-            x * (self.rho - z) - y,
-            x * y - self.beta * z,
-        )
-    }
-
+    /// Runge-Kutta 4th order integration step for the Lorenz equations:
+    ///   dx/dt = σ (y − x)
+    ///   dy/dt = x (ρ − z) − y
+    ///   dz/dt = x y − β z
     fn rk4_step(&mut self) {
         let dt = self.dt;
-        let (x, y, z) = (self.x, self.y, self.z);
-
-        let (k1x, k1y, k1z) = self.derivatives(x, y, z);
-        let (k2x, k2y, k2z) = self.derivatives(
-            x + 0.5 * dt * k1x,
-            y + 0.5 * dt * k1y,
-            z + 0.5 * dt * k1z,
-        );
-        let (k3x, k3y, k3z) = self.derivatives(
-            x + 0.5 * dt * k2x,
-            y + 0.5 * dt * k2y,
-            z + 0.5 * dt * k2z,
-        );
-        let (k4x, k4y, k4z) =
-            self.derivatives(x + dt * k3x, y + dt * k3y, z + dt * k3z);
-
-        self.x = x + dt / 6.0 * (k1x + 2.0 * k2x + 2.0 * k3x + k4x);
-        self.y = y + dt / 6.0 * (k1y + 2.0 * k2y + 2.0 * k3y + k4y);
-        self.z = z + dt / 6.0 * (k1z + 2.0 * k2z + 2.0 * k3z + k4z);
+        
+        // k1
+        let dx1 = self.sigma * (self.y - self.x);
+        let dy1 = self.x * (self.rho - self.z) - self.y;
+        let dz1 = self.x * self.y - self.beta * self.z;
+        
+        // k2
+        let x2 = self.x + 0.5 * dt * dx1;
+        let y2 = self.y + 0.5 * dt * dy1;
+        let z2 = self.z + 0.5 * dt * dz1;
+        let dx2 = self.sigma * (y2 - x2);
+        let dy2 = x2 * (self.rho - z2) - y2;
+        let dz2 = x2 * y2 - self.beta * z2;
+        
+        // k3
+        let x3 = self.x + 0.5 * dt * dx2;
+        let y3 = self.y + 0.5 * dt * dy2;
+        let z3 = self.z + 0.5 * dt * dz2;
+        let dx3 = self.sigma * (y3 - x3);
+        let dy3 = x3 * (self.rho - z3) - y3;
+        let dz3 = x3 * y3 - self.beta * z3;
+        
+        // k4
+        let x4 = self.x + dt * dx3;
+        let y4 = self.y + dt * dy3;
+        let z4 = self.z + dt * dz3;
+        let dx4 = self.sigma * (y4 - x4);
+        let dy4 = x4 * (self.rho - z4) - y4;
+        let dz4 = x4 * y4 - self.beta * z4;
+        
+        // Update state
+        self.x += dt * (dx1 + 2.0 * dx2 + 2.0 * dx3 + dx4) / 6.0;
+        self.y += dt * (dy1 + 2.0 * dy2 + 2.0 * dy3 + dy4) / 6.0;
+        self.z += dt * (dz1 + 2.0 * dz2 + 2.0 * dz3 + dz4) / 6.0;
     }
+}
 
-    pub fn randomize(&mut self) {
+impl Shape for Lorenz {
+
+    fn randomize(&mut self) {
         let mut rng = rand::thread_rng();
 
         // Vary parameters near the classic chaotic regime
@@ -93,7 +108,7 @@ impl Lorenz {
         self.steps_done = 0;
     }
 
-    pub fn reset(&mut self) {
+    fn reset(&mut self) {
         let mut rng = rand::thread_rng();
         self.x = rng.gen_range(-5.0..5.0);
         self.y = rng.gen_range(-5.0..5.0);
@@ -101,11 +116,11 @@ impl Lorenz {
         self.steps_done = 0;
     }
 
-    pub fn name() -> &'static str {
+    fn name(&self) -> &'static str {
         "lorenz"
     }
 
-    pub fn step(&mut self) -> Option<(f64, f64)> {
+    fn step(&mut self) -> Option<(f64, f64)> {
         if self.steps_done >= self.max_steps {
             return None;
         }
@@ -118,7 +133,7 @@ impl Lorenz {
         Some((px, py))
     }
 
-    pub fn get_param(&self, name: &str) -> Option<f64> {
+    fn get_param(&self, name: &str) -> Option<f64> {
         match name {
             "lorenz.sigma" => Some(self.sigma),
             "lorenz.rho" => Some(self.rho),
@@ -129,7 +144,7 @@ impl Lorenz {
         }
     }
 
-    pub fn set_param(&mut self, name: &str, value: f64) -> bool {
+    fn set_param(&mut self, name: &str, value: f64) -> bool {
         match name {
             "lorenz.sigma" => self.sigma = value,
             "lorenz.rho" => self.rho = value,
@@ -141,7 +156,7 @@ impl Lorenz {
         true
     }
 
-    pub fn all_params(&self) -> Vec<(&'static str, f64)> {
+    fn all_params(&self) -> Vec<(&'static str, f64)> {
         vec![
             ("lorenz.sigma", self.sigma),
             ("lorenz.rho", self.rho),

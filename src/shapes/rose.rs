@@ -1,6 +1,7 @@
 use std::f64::consts::PI;
 
 use rand::Rng;
+use super::Shape;
 
 /// Rose (rhodonea) curves — polar flowers.
 ///
@@ -40,8 +41,11 @@ impl Rose {
         r.randomize();
         r
     }
+}
 
-    pub fn randomize(&mut self) {
+impl Shape for Rose {
+
+    fn randomize(&mut self) {
         let mut rng = rand::thread_rng();
 
         // Pick from interesting k values (integer and rational)
@@ -80,15 +84,15 @@ impl Rose {
         self.max_t = d * PI * 4.0 + 80.0;
     }
 
-    pub fn reset(&mut self) {
+    fn reset(&mut self) {
         self.t = 0.0;
     }
 
-    pub fn name() -> &'static str {
+    fn name(&self) -> &'static str {
         "rose"
     }
 
-    pub fn step(&mut self) -> Option<(f64, f64)> {
+    fn step(&mut self) -> Option<(f64, f64)> {
         if self.t > self.max_t {
             return None;
         }
@@ -104,7 +108,7 @@ impl Rose {
         Some((x, y))
     }
 
-    pub fn get_param(&self, name: &str) -> Option<f64> {
+    fn get_param(&self, name: &str) -> Option<f64> {
         match name {
             "rose.k" => Some(self.k),
             "rose.k2" => Some(self.k2),
@@ -116,7 +120,7 @@ impl Rose {
         }
     }
 
-    pub fn set_param(&mut self, name: &str, value: f64) -> bool {
+    fn set_param(&mut self, name: &str, value: f64) -> bool {
         match name {
             "rose.k" => self.k = value,
             "rose.k2" => self.k2 = value,
@@ -129,7 +133,7 @@ impl Rose {
         true
     }
 
-    pub fn all_params(&self) -> Vec<(&'static str, f64)> {
+    fn all_params(&self) -> Vec<(&'static str, f64)> {
         vec![
             ("rose.k", self.k),
             ("rose.k2", self.k2),

@@ -11,10 +11,6 @@ path = "src/main.rs"
 name = "wl-harmonograph-ctl"
 path = "src/bin/ctl.rs"
 
-[[bin]]
-name = "wl-harmonograph-ascii"
-path = "src/bin/ascii.rs"
-
 [dependencies]
 smithay-client-toolkit = { version = "0.20", default-features = false, features = ["calloop"] }
 wayland-client = "0.31"

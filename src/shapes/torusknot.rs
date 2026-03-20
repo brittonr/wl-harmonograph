@@ -1,4 +1,5 @@
 use rand::Rng;
+use super::Shape;
 
 /// Torus knot — a closed curve winding p times around the axis of a
 /// torus and q times through its hole.
@@ -73,25 +74,39 @@ impl TorusKnot {
         k
     }
 
-    fn rotate(&self, x: f64, y: f64, z: f64) -> [f64; 3] {
-        let (sx, cx) = self.angle_x.sin_cos();
-        let (sy, cy) = self.angle_y.sin_cos();
+    fn rotate(&self, x: f64, y: f64, z: f64) -> (f64, f64, f64) {
+        // Rotate around X axis
+        let cos_x = self.angle_x.cos();
+        let sin_x = self.angle_x.sin();
+        let y1 = y * cos_x - z * sin_x;
+        let z1 = y * sin_x + z * cos_x;
 
-        // Rx then Ry (two axes is enough for full coverage over time)
-        let (x1, y1, z1) = (x, cx * y - sx * z, sx * y + cx * z);
-        [cy * x1 + sy * z1, y1, -sy * x1 + cy * z1]
+        // Rotate around Y axis
+        let cos_y = self.angle_y.cos();
+        let sin_y = self.angle_y.sin();
+        let x2 = x * cos_y + z1 * sin_y;
+        let z2 = -x * sin_y + z1 * cos_y;
+
+        (x2, y1, z2)
     }
 
-    fn project(&self, p: [f64; 3]) -> (f64, f64) {
-        let s = self.perspective / (self.perspective + p[2]);
-        (p[0] * s, p[1] * s)
+    fn project(&self, (x, y, z): (f64, f64, f64)) -> (f64, f64) {
+        // Simple perspective projection
+        let distance = self.perspective + z;
+        if distance.abs() < 0.01 {
+            return (0.0, 0.0);
+        }
+        (x / distance, y / distance)
     }
+}
 
-    pub fn name() -> &'static str {
+impl Shape for TorusKnot {
+
+    fn name(&self) -> &'static str {
         "torusknot"
     }
 
-    pub fn randomize(&mut self) {
+    fn randomize(&mut self) {
         let mut rng = rand::thread_rng();
 
         let (p, q) = KNOT_TYPES[rng.gen_range(0..KNOT_TYPES.len())];
@@ -128,11 +143,11 @@ impl TorusKnot {
         self.t = 0.0;
     }
 
-    pub fn reset(&mut self) {
+    fn reset(&mut self) {
         self.t = 0.0;
     }
 
-    pub fn step(&mut self) -> Option<(f64, f64)> {
+    fn step(&mut self) -> Option<(f64, f64)> {
         if self.t > self.max_t {
             return None;
         }
@@ -162,7 +177,7 @@ impl TorusKnot {
         ))
     }
 
-    pub fn get_param(&self, name: &str) -> Option<f64> {
+    fn get_param(&self, name: &str) -> Option<f64> {
         match name {
             "knot.p" => Some(self.p),
             "knot.q" => Some(self.q),
@@ -179,7 +194,7 @@ impl TorusKnot {
         }
     }
 
-    pub fn set_param(&mut self, name: &str, value: f64) -> bool {
+    fn set_param(&mut self, name: &str, value: f64) -> bool {
         match name {
             "knot.p" => self.p = value,
             "knot.q" => self.q = value,
@@ -197,7 +212,7 @@ impl TorusKnot {
         true
     }
 
-    pub fn all_params(&self) -> Vec<(&'static str, f64)> {
+    fn all_params(&self) -> Vec<(&'static str, f64)> {
         vec![
             ("knot.p", self.p),
             ("knot.q", self.q),

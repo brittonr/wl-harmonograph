@@ -42,6 +42,19 @@ use wayland_client::protocol::{wl_output, wl_surface};
 use wayland_client::{Connection, Proxy, QueueHandle};
 
 // ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+/// Scale factor applied to the smaller display dimension for aspect-ratio normalization.
+const ASPECT_SCALE: f64 = 0.8;
+
+/// Divisor for converting line width from user-facing pixels to NDC units.
+const LINE_WIDTH_DIVISOR: f64 = 6.0;
+
+/// Number of Catmull-Rom subdivisions per curve segment.
+const CURVE_SUBDIVISIONS: usize = 16;
+
+// ---------------------------------------------------------------------------
 // GL renderer
 // ---------------------------------------------------------------------------
 
@@ -91,9 +104,9 @@ impl GlRenderer {
             }
         "#;
         let program = Self::create_program(&gl, vs_src, fs_src);
-        let u_color = gl.get_uniform_location(program, "u_color").unwrap();
-        let a_pos = gl.get_attrib_location(program, "a_pos").unwrap();
-        let a_cross = gl.get_attrib_location(program, "a_cross").unwrap();
+        let u_color = gl.get_uniform_location(program, "u_color").expect("uniform u_color");
+        let a_pos = gl.get_attrib_location(program, "a_pos").expect("attrib a_pos");
+        let a_cross = gl.get_attrib_location(program, "a_cross").expect("attrib a_cross");
 
         // --- Blit shader (composite FBO over background color) ---
         let blit_vs = r#"#version 100
@@ -145,17 +158,17 @@ impl GlRenderer {
             }
         "#;
         let blit_program = Self::create_program(&gl, blit_vs, blit_fs);
-        let u_bg = gl.get_uniform_location(blit_program, "u_bg").unwrap();
-        let u_dither_strength = gl.get_uniform_location(blit_program, "u_dither_strength").unwrap();
-        let u_dither_levels = gl.get_uniform_location(blit_program, "u_dither_levels").unwrap();
-        let u_dither_scale = gl.get_uniform_location(blit_program, "u_dither_scale").unwrap();
-        let u_resolution = gl.get_uniform_location(blit_program, "u_resolution").unwrap();
+        let u_bg = gl.get_uniform_location(blit_program, "u_bg").expect("uniform u_bg");
+        let u_dither_strength = gl.get_uniform_location(blit_program, "u_dither_strength").expect("uniform u_dither_strength");
+        let u_dither_levels = gl.get_uniform_location(blit_program, "u_dither_levels").expect("uniform u_dither_levels");
+        let u_dither_scale = gl.get_uniform_location(blit_program, "u_dither_scale").expect("uniform u_dither_scale");
+        let u_resolution = gl.get_uniform_location(blit_program, "u_resolution").expect("uniform u_resolution");
 
         // VBO for line strips
-        let vbo = gl.create_buffer().unwrap();
+        let vbo = gl.create_buffer().expect("create VBO");
 
         // Fullscreen quad VBO for blit
-        let blit_vbo = gl.create_buffer().unwrap();
+        let blit_vbo = gl.create_buffer().expect("create blit VBO");
         #[rustfmt::skip]
         let quad: [f32; 12] = [
             -1.0, -1.0,  1.0, -1.0, -1.0,  1.0,
@@ -196,8 +209,8 @@ impl GlRenderer {
     }
 
     unsafe fn create_program(gl: &glow::Context, vs_src: &str, fs_src: &str) -> glow::Program {
-        let program = gl.create_program().unwrap();
-        let vs = gl.create_shader(glow::VERTEX_SHADER).unwrap();
+        let program = gl.create_program().expect("create program");
+        let vs = gl.create_shader(glow::VERTEX_SHADER).expect("create vertex shader");
         gl.shader_source(vs, vs_src);
         gl.compile_shader(vs);
         assert!(
@@ -205,7 +218,7 @@ impl GlRenderer {
             "VS: {}",
             gl.get_shader_info_log(vs)
         );
-        let fs = gl.create_shader(glow::FRAGMENT_SHADER).unwrap();
+        let fs = gl.create_shader(glow::FRAGMENT_SHADER).expect("create fragment shader");
         gl.shader_source(fs, fs_src);
         gl.compile_shader(fs);
         assert!(
@@ -231,7 +244,7 @@ impl GlRenderer {
         width: u32,
         height: u32,
     ) -> (glow::Framebuffer, glow::Texture) {
-        let tex = gl.create_texture().unwrap();
+        let tex = gl.create_texture().expect("create FBO texture");
         gl.bind_texture(glow::TEXTURE_2D, Some(tex));
         gl.tex_image_2d(
             glow::TEXTURE_2D,
@@ -255,7 +268,7 @@ impl GlRenderer {
             glow::LINEAR as i32,
         );
 
-        let fbo = gl.create_framebuffer().unwrap();
+        let fbo = gl.create_framebuffer().expect("create FBO");
         gl.bind_framebuffer(glow::FRAMEBUFFER, Some(fbo));
         gl.framebuffer_texture_2d(
             glow::FRAMEBUFFER,
@@ -376,7 +389,7 @@ impl GlRenderer {
         gl.bind_texture(glow::TEXTURE_2D, Some(self.fbo_texture));
 
         gl.bind_buffer(glow::ARRAY_BUFFER, Some(self.blit_vbo));
-        let a_pos = gl.get_attrib_location(self.blit_program, "a_pos").unwrap();
+        let a_pos = gl.get_attrib_location(self.blit_program, "a_pos").expect("attrib a_pos");
         gl.enable_vertex_attrib_array(a_pos);
         gl.vertex_attrib_pointer_f32(a_pos, 2, glow::FLOAT, false, 8, 0);
 
@@ -416,8 +429,7 @@ struct OutputSurface {
     height: u32,
     configured: bool,
     egl_surface: khronos_egl::Surface,
-    #[allow(dead_code)]
-    wl_egl_surface: wayland_egl::WlEglSurface,
+    _wl_egl_surface: wayland_egl::WlEglSurface,
     renderer: Option<GlRenderer>,
 }
 
@@ -459,6 +471,25 @@ struct App {
 }
 
 impl App {
+    /// Make each output's EGL surface current and clear its renderer.
+    fn clear_all_outputs(&mut self) {
+        for (_wl, osurface) in &mut self.outputs {
+            if let Some(os) = osurface {
+                if let Some(ref renderer) = os.renderer {
+                    self.egl
+                        .make_current(
+                            self.egl_display,
+                            Some(os.egl_surface),
+                            Some(os.egl_surface),
+                            Some(self.egl_context),
+                        )
+                        .expect("EGL make_current for clear");
+                    unsafe { renderer.clear() };
+                }
+            }
+        }
+    }
+
     fn pick_new_color(&mut self) {
         let mut rng = rand::thread_rng();
         if self.fg_colors.len() <= 1 {
@@ -475,21 +506,7 @@ impl App {
     }
 
     fn restart(&mut self) {
-        for (_wl, osurface) in &mut self.outputs {
-            if let Some(os) = osurface {
-                if let Some(ref renderer) = os.renderer {
-                    self.egl
-                        .make_current(
-                            self.egl_display,
-                            Some(os.egl_surface),
-                            Some(os.egl_surface),
-                            Some(self.egl_context),
-                        )
-                        .unwrap();
-                    unsafe { renderer.clear() };
-                }
-            }
-        }
+        self.clear_all_outputs();
         if let Some(ref lock) = self.shape_lock {
             // Locked to a specific shape — re-randomize same type
             let name = lock.clone();
@@ -544,18 +561,18 @@ impl App {
                             Some(os.egl_surface),
                             Some(self.egl_context),
                         )
-                        .unwrap();
+                        .expect("EGL make_current");
                     unsafe {
                         renderer.fade(self.fade_amount);
                         if draw {
                             let line_width =
-                                self.line_width * 6.0 / os.height.min(os.width) as f64;
+                                self.line_width * LINE_WIDTH_DIVISOR / os.height.min(os.width) as f64;
                             verts.clear();
                             self.curve.append_catmull_rom_strip(
                                 self.scale_x,
                                 self.scale_y,
                                 line_width,
-                                16,
+                                CURVE_SUBDIVISIONS,
                                 &mut verts,
                             );
                             if !verts.is_empty() {
@@ -571,7 +588,7 @@ impl App {
                     }
                     self.egl
                         .swap_buffers(self.egl_display, os.egl_surface)
-                        .unwrap();
+                        .expect("EGL swap_buffers");
                     os.layer
                         .wl_surface()
                         .damage_buffer(0, 0, os.width as i32, os.height as i32);
@@ -635,8 +652,8 @@ impl App {
                 Some(egl_surface),
                 Some(self.egl_context),
             )
-            .unwrap();
-        self.egl.swap_interval(self.egl_display, 0).unwrap();
+            .expect("EGL make_current");
+        self.egl.swap_interval(self.egl_display, 0).expect("EGL swap_interval");
 
         let os = OutputSurface {
             layer,
@@ -644,7 +661,7 @@ impl App {
             height,
             configured: false,
             egl_surface,
-            wl_egl_surface,
+            _wl_egl_surface: wl_egl_surface,
             renderer: None,
         };
 
@@ -669,7 +686,7 @@ impl App {
                     Some(os.egl_surface),
                     Some(self.egl_context),
                 )
-                .unwrap();
+                .expect("EGL make_current");
 
             let gl = unsafe {
                 glow::Context::from_loader_function(|name| {
@@ -707,8 +724,8 @@ impl App {
         }
         if max_w > 0 && max_h > 0 {
             let min_dim = max_w.min(max_h) as f64;
-            self.scale_x = min_dim * 0.8 / max_w as f64;
-            self.scale_y = min_dim * 0.8 / max_h as f64;
+            self.scale_x = min_dim * ASPECT_SCALE / max_w as f64;
+            self.scale_y = min_dim * ASPECT_SCALE / max_h as f64;
             info!(
                 "Updated scales: {:.3} x {:.3} (from {}x{})",
                 self.scale_x, self.scale_y, max_w, max_h
@@ -805,21 +822,7 @@ impl App {
                 if shapes::SHAPE_NAMES.contains(&value_str) {
                     self.curve.switch_shape(value_str);
                     // Clear all outputs for the new shape
-                    for (_wl, osurface) in &mut self.outputs {
-                        if let Some(os) = osurface {
-                            if let Some(ref renderer) = os.renderer {
-                                self.egl
-                                    .make_current(
-                                        self.egl_display,
-                                        Some(os.egl_surface),
-                                        Some(os.egl_surface),
-                                        Some(self.egl_context),
-                                    )
-                                    .unwrap();
-                                unsafe { renderer.clear() };
-                            }
-                        }
-                    }
+                    self.clear_all_outputs();
                     "ok\n".into()
                 } else {
                     format!(
@@ -844,21 +847,7 @@ impl App {
 
     fn cmd_restart(&mut self) -> String {
         self.curve.reset_time();
-        for (_wl, osurface) in &mut self.outputs {
-            if let Some(os) = osurface {
-                if let Some(ref renderer) = os.renderer {
-                    self.egl
-                        .make_current(
-                            self.egl_display,
-                            Some(os.egl_surface),
-                            Some(os.egl_surface),
-                            Some(self.egl_context),
-                        )
-                        .unwrap();
-                    unsafe { renderer.clear() };
-                }
-            }
-        }
+        self.clear_all_outputs();
         "ok\n".into()
     }
 
@@ -873,23 +862,9 @@ impl App {
     }
 
     fn cmd_next_shape(&mut self) -> String {
-        let next = self.curve.shape.next_name().to_string();
+        let next = shapes::next_shape_name(self.curve.shape.name()).to_string();
         self.curve.switch_shape(&next);
-        for (_wl, osurface) in &mut self.outputs {
-            if let Some(os) = osurface {
-                if let Some(ref renderer) = os.renderer {
-                    self.egl
-                        .make_current(
-                            self.egl_display,
-                            Some(os.egl_surface),
-                            Some(os.egl_surface),
-                            Some(self.egl_context),
-                        )
-                        .unwrap();
-                    unsafe { renderer.clear() };
-                }
-            }
-        }
+        self.clear_all_outputs();
         format!("ok shape={}\n", next)
     }
 }
@@ -997,7 +972,7 @@ impl LayerShellHandler for App {
                     let new_h = configure.new_size.1.max(1);
                     os.width = new_w;
                     os.height = new_h;
-                    os.wl_egl_surface.resize(new_w as i32, new_h as i32, 0, 0);
+                    os._wl_egl_surface.resize(new_w as i32, new_h as i32, 0, 0);
                     os.configured = true;
                     found_idx = Some(i);
                     info!("Layer surface configured: {}x{}", new_w, new_h);
@@ -1162,10 +1137,10 @@ fn run_wayland() {
     let initial_shape = match shape_env.to_lowercase().as_str() {
         "" | "random" => {
             shape_lock = None;
-            shapes::Shape::random()
+            shapes::random_shape()
         }
         name => {
-            if let Some(s) = shapes::Shape::from_name(name) {
+            if let Some(s) = shapes::shape_from_name(name) {
                 shape_lock = Some(name.to_string());
                 s
             } else {
@@ -1175,7 +1150,7 @@ fn run_wayland() {
                     shapes::SHAPE_NAMES.join(", ")
                 );
                 shape_lock = None;
-                shapes::Shape::random()
+                shapes::random_shape()
             }
         }
     };

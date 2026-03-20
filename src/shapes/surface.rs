@@ -1,6 +1,7 @@
 use std::f64::consts::{PI, TAU};
 
 use rand::Rng;
+use super::Shape;
 
 /// Spinning 3D surface shapes projected to 2D.
 ///
@@ -61,7 +62,7 @@ const SURFACE_KINDS: &[SurfaceKind] = &[
 ];
 
 impl SurfaceKind {
-    fn label(self) -> &'static str {
+    fn _label(self) -> &'static str {
         match self {
             SurfaceKind::Torus => "torus",
             SurfaceKind::Sphere => "sphere",
@@ -200,27 +201,6 @@ impl Surface {
         (p[0] * s * self.output_scale, p[1] * s * self.output_scale)
     }
 
-    pub fn randomize(&mut self) {
-        let mut rng = rand::thread_rng();
-
-        self.kind = SurfaceKind::from_index(rng.gen_range(0..SURFACE_KINDS.len()));
-        self.randomize_for_kind(&mut rng);
-
-        self.angle_x = rng.gen_range(0.0..TAU);
-        self.angle_y = rng.gen_range(0.0..TAU);
-        self.angle_z = rng.gen_range(0.0..TAU);
-
-        let sign = |rng: &mut rand::rngs::ThreadRng| if rng.gen_bool(0.5) { 1.0 } else { -1.0 };
-        self.rot_speed_x = rng.gen_range(0.0008..0.003) * sign(&mut rng);
-        self.rot_speed_y = rng.gen_range(0.0008..0.003) * sign(&mut rng);
-        self.rot_speed_z = rng.gen_range(0.0003..0.0015) * sign(&mut rng);
-
-        self.perspective = rng.gen_range(2.5..5.0);
-
-        self.t = 0.0;
-        self.steps_done = 0;
-    }
-
     fn randomize_for_kind(&mut self, rng: &mut rand::rngs::ThreadRng) {
         match self.kind {
             SurfaceKind::Torus => {
@@ -267,20 +247,14 @@ impl Surface {
             }
         }
     }
+}
 
-    pub fn reset(&mut self) {
-        let mut rng = rand::thread_rng();
-        self.angle_x = rng.gen_range(0.0..TAU);
-        self.angle_y = rng.gen_range(0.0..TAU);
-        self.t = 0.0;
-        self.steps_done = 0;
-    }
-
-    pub fn name() -> &'static str {
+impl Shape for Surface {
+    fn name(&self) -> &'static str {
         "surface"
     }
 
-    pub fn step(&mut self) -> Option<(f64, f64)> {
+    fn step(&mut self) -> Option<(f64, f64)> {
         if self.steps_done >= self.max_steps {
             return None;
         }
@@ -298,7 +272,36 @@ impl Surface {
         Some((px, py))
     }
 
-    pub fn get_param(&self, name: &str) -> Option<f64> {
+    fn randomize(&mut self) {
+        let mut rng = rand::thread_rng();
+
+        self.kind = SurfaceKind::from_index(rng.gen_range(0..SURFACE_KINDS.len()));
+        self.randomize_for_kind(&mut rng);
+
+        self.angle_x = rng.gen_range(0.0..TAU);
+        self.angle_y = rng.gen_range(0.0..TAU);
+        self.angle_z = rng.gen_range(0.0..TAU);
+
+        let sign = |rng: &mut rand::rngs::ThreadRng| if rng.gen_bool(0.5) { 1.0 } else { -1.0 };
+        self.rot_speed_x = rng.gen_range(0.0008..0.003) * sign(&mut rng);
+        self.rot_speed_y = rng.gen_range(0.0008..0.003) * sign(&mut rng);
+        self.rot_speed_z = rng.gen_range(0.0003..0.0015) * sign(&mut rng);
+
+        self.perspective = rng.gen_range(2.5..5.0);
+
+        self.t = 0.0;
+        self.steps_done = 0;
+    }
+
+    fn reset(&mut self) {
+        let mut rng = rand::thread_rng();
+        self.angle_x = rng.gen_range(0.0..TAU);
+        self.angle_y = rng.gen_range(0.0..TAU);
+        self.t = 0.0;
+        self.steps_done = 0;
+    }
+
+    fn get_param(&self, name: &str) -> Option<f64> {
         match name {
             "surf.kind" => Some(self.kind.index() as f64),
             "surf.big_r" => Some(self.big_r),
@@ -316,7 +319,7 @@ impl Surface {
         }
     }
 
-    pub fn set_param(&mut self, name: &str, value: f64) -> bool {
+    fn set_param(&mut self, name: &str, value: f64) -> bool {
         match name {
             "surf.kind" => {
                 self.kind = SurfaceKind::from_index(value as usize);
@@ -337,7 +340,7 @@ impl Surface {
         true
     }
 
-    pub fn all_params(&self) -> Vec<(&'static str, f64)> {
+    fn all_params(&self) -> Vec<(&'static str, f64)> {
         vec![
             ("surf.kind", self.kind.index() as f64),
             ("surf.big_r", self.big_r),

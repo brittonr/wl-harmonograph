@@ -18,7 +18,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 use ratatui::Terminal;
 
-use crate::shapes::{Shape, SHAPE_NAMES};
+use crate::shapes::{self, Shape, SHAPE_NAMES};
 use crate::{colors_from_env, parse_env_f32, parse_env_u32, Color};
 
 /// ASCII density ramp from empty to full.
@@ -38,8 +38,8 @@ pub fn run() {
 
     let shape_env = std::env::var("HARMONOGRAPH_SHAPE").unwrap_or_default();
     let (shape_lock, initial_shape) = match shape_env.to_lowercase().as_str() {
-        "" | "random" => (None, Shape::random()),
-        name => match Shape::from_name(name) {
+        "" | "random" => (None, shapes::random_shape()),
+        name => match shapes::shape_from_name(name) {
             Some(s) => (Some(name.to_string()), s),
             None => {
                 eprintln!(
@@ -47,7 +47,7 @@ pub fn run() {
                     name,
                     SHAPE_NAMES.join(", ")
                 );
-                (None, Shape::random())
+                (None, shapes::random_shape())
             }
         },
     };
@@ -123,7 +123,7 @@ pub fn run() {
 // ---------------------------------------------------------------------------
 
 struct AsciiApp {
-    shape: Shape,
+    shape: Box<dyn Shape>,
     shape_lock: Option<String>,
 
     grid: Vec<f64>,
@@ -146,7 +146,7 @@ impl AsciiApp {
     fn new(
         width: usize,
         height: usize,
-        shape: Shape,
+        shape: Box<dyn Shape>,
         shape_lock: Option<String>,
         fg_colors: Vec<Color>,
         bg_color: Color,
@@ -197,9 +197,9 @@ impl AsciiApp {
         self.prev = None;
         if let Some(ref lock) = self.shape_lock {
             let name = lock.clone();
-            self.shape = Shape::from_name(&name).unwrap_or_else(Shape::random);
+            self.shape = shapes::shape_from_name(&name).unwrap_or_else(shapes::random_shape);
         } else {
-            self.shape = Shape::random();
+            self.shape = shapes::random_shape();
         }
         self.pick_color();
     }
@@ -207,15 +207,15 @@ impl AsciiApp {
     fn randomize(&mut self) {
         self.grid.fill(0.0);
         self.prev = None;
-        self.shape = Shape::random();
+        self.shape = shapes::random_shape();
         self.pick_color();
     }
 
     fn next_shape(&mut self) {
-        let next = self.shape.next_name().to_string();
+        let next = shapes::next_shape_name(self.shape.name()).to_string();
         self.grid.fill(0.0);
         self.prev = None;
-        self.shape = Shape::from_name(&next).unwrap_or_else(Shape::random);
+        self.shape = shapes::shape_from_name(&next).unwrap_or_else(shapes::random_shape);
         self.pick_color();
     }
 

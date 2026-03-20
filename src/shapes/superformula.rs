@@ -1,4 +1,5 @@
 use rand::Rng;
+use super::Shape;
 
 /// Superformula — Johan Gielis's generalization of the superellipse (2003).
 ///
@@ -39,19 +40,17 @@ impl Superformula {
         s
     }
 
-    /// Evaluate the superformula radius at angle theta.
     fn radius(&self, theta: f64) -> f64 {
         let angle = self.m * theta / 4.0;
-        let term1 = (angle.cos() / self.a).abs().powf(self.n2);
-        let term2 = (angle.sin() / self.b).abs().powf(self.n3);
-        let sum = term1 + term2;
-        if sum < 1e-12 {
-            return 0.0;
-        }
-        sum.powf(-1.0 / self.n1)
+        let cos_term = (angle.cos() / self.a).abs().powf(self.n2);
+        let sin_term = (angle.sin() / self.b).abs().powf(self.n3);
+        (cos_term + sin_term).powf(-1.0 / self.n1)
     }
+}
 
-    pub fn randomize(&mut self) {
+impl Shape for Superformula {
+
+    fn randomize(&mut self) {
         let mut rng = rand::thread_rng();
 
         // Curated presets that produce distinctive shapes, with randomization.
@@ -101,15 +100,15 @@ impl Superformula {
         self.max_t = self.m.max(4.0) * std::f64::consts::TAU + 150.0;
     }
 
-    pub fn reset(&mut self) {
+    fn reset(&mut self) {
         self.t = 0.0;
     }
 
-    pub fn name() -> &'static str {
+    fn name(&self) -> &'static str {
         "superformula"
     }
 
-    pub fn step(&mut self) -> Option<(f64, f64)> {
+    fn step(&mut self) -> Option<(f64, f64)> {
         if self.t > self.max_t {
             return None;
         }
@@ -122,7 +121,7 @@ impl Superformula {
         Some((x, y))
     }
 
-    pub fn get_param(&self, name: &str) -> Option<f64> {
+    fn get_param(&self, name: &str) -> Option<f64> {
         match name {
             "sf.m" => Some(self.m),
             "sf.n1" => Some(self.n1),
@@ -137,7 +136,7 @@ impl Superformula {
         }
     }
 
-    pub fn set_param(&mut self, name: &str, value: f64) -> bool {
+    fn set_param(&mut self, name: &str, value: f64) -> bool {
         match name {
             "sf.m" => self.m = value,
             "sf.n1" => self.n1 = value,
@@ -153,7 +152,7 @@ impl Superformula {
         true
     }
 
-    pub fn all_params(&self) -> Vec<(&'static str, f64)> {
+    fn all_params(&self) -> Vec<(&'static str, f64)> {
         vec![
             ("sf.m", self.m),
             ("sf.n1", self.n1),

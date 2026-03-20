@@ -1,4 +1,5 @@
 use rand::Rng;
+use super::Shape;
 
 /// Rotating 3D wireframe Platonic solids projected to 2D.
 ///
@@ -91,12 +92,15 @@ impl Wireframe {
         let s = self.perspective / (self.perspective + p[2]);
         (p[0] * s, p[1] * s)
     }
+}
 
-    pub fn name() -> &'static str {
+impl Shape for Wireframe {
+
+    fn name(&self) -> &'static str {
         "wireframe"
     }
 
-    pub fn randomize(&mut self) {
+    fn randomize(&mut self) {
         let mut rng = rand::thread_rng();
 
         let polys = [
@@ -132,12 +136,12 @@ impl Wireframe {
         self.total_steps = 0;
     }
 
-    pub fn reset(&mut self) {
+    fn reset(&mut self) {
         self.t = 0.0;
         self.total_steps = 0;
     }
 
-    pub fn step(&mut self) -> Option<(f64, f64)> {
+    fn step(&mut self) -> Option<(f64, f64)> {
         if self.total_steps >= self.max_steps || self.path.len() < 2 {
             return None;
         }
@@ -173,7 +177,7 @@ impl Wireframe {
         ))
     }
 
-    pub fn get_param(&self, name: &str) -> Option<f64> {
+    fn get_param(&self, name: &str) -> Option<f64> {
         match name {
             "wire.rot_x" => Some(self.rot_speed_x),
             "wire.rot_y" => Some(self.rot_speed_y),
@@ -187,7 +191,7 @@ impl Wireframe {
         }
     }
 
-    pub fn set_param(&mut self, name: &str, value: f64) -> bool {
+    fn set_param(&mut self, name: &str, value: f64) -> bool {
         match name {
             "wire.rot_x" => self.rot_speed_x = value,
             "wire.rot_y" => self.rot_speed_y = value,
@@ -202,7 +206,7 @@ impl Wireframe {
         true
     }
 
-    pub fn all_params(&self) -> Vec<(&'static str, f64)> {
+    fn all_params(&self) -> Vec<(&'static str, f64)> {
         vec![
             ("wire.rot_x", self.rot_speed_x),
             ("wire.rot_y", self.rot_speed_y),

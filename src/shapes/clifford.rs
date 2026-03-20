@@ -1,4 +1,5 @@
 use rand::Rng;
+use super::Shape;
 
 /// Clifford attractor — a 2D iterated map that produces swirling,
 /// feathery structures from four parameters.
@@ -35,8 +36,11 @@ impl Clifford {
         s.randomize();
         s
     }
+}
 
-    pub fn randomize(&mut self) {
+impl Shape for Clifford {
+
+    fn randomize(&mut self) {
         let mut rng = rand::thread_rng();
 
         // Parameters in [-3, 3] produce the best visual variety.
@@ -70,18 +74,18 @@ impl Clifford {
         self.steps_done = 0;
     }
 
-    pub fn reset(&mut self) {
+    fn reset(&mut self) {
         let mut rng = rand::thread_rng();
         self.x = rng.gen_range(-0.1..0.1);
         self.y = rng.gen_range(-0.1..0.1);
         self.steps_done = 0;
     }
 
-    pub fn name() -> &'static str {
+    fn name(&self) -> &'static str {
         "clifford"
     }
 
-    pub fn step(&mut self) -> Option<(f64, f64)> {
+    fn step(&mut self) -> Option<(f64, f64)> {
         if self.steps_done >= self.max_steps {
             return None;
         }
@@ -96,7 +100,7 @@ impl Clifford {
         Some((self.x / 2.5, self.y / 2.5))
     }
 
-    pub fn get_param(&self, name: &str) -> Option<f64> {
+    fn get_param(&self, name: &str) -> Option<f64> {
         match name {
             "cliff.a" => Some(self.a),
             "cliff.b" => Some(self.b),
@@ -107,7 +111,7 @@ impl Clifford {
         }
     }
 
-    pub fn set_param(&mut self, name: &str, value: f64) -> bool {
+    fn set_param(&mut self, name: &str, value: f64) -> bool {
         match name {
             "cliff.a" => self.a = value,
             "cliff.b" => self.b = value,
@@ -119,7 +123,7 @@ impl Clifford {
         true
     }
 
-    pub fn all_params(&self) -> Vec<(&'static str, f64)> {
+    fn all_params(&self) -> Vec<(&'static str, f64)> {
         vec![
             ("cliff.a", self.a),
             ("cliff.b", self.b),

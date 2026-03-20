@@ -1,4 +1,5 @@
 use rand::Rng;
+use super::Shape;
 
 /// Hypotrochoid / epitrochoid curves — the math behind a Spirograph toy.
 ///
@@ -35,8 +36,11 @@ impl Spirograph {
         s.randomize();
         s
     }
+}
 
-    pub fn randomize(&mut self) {
+impl Shape for Spirograph {
+
+    fn randomize(&mut self) {
         let mut rng = rand::thread_rng();
 
         self.big_r = 1.0;
@@ -66,15 +70,15 @@ impl Spirograph {
         self.max_t = d * std::f64::consts::TAU * 3.0 + 100.0;
     }
 
-    pub fn reset(&mut self) {
+    fn reset(&mut self) {
         self.t = 0.0;
     }
 
-    pub fn name() -> &'static str {
+    fn name(&self) -> &'static str {
         "spirograph"
     }
 
-    pub fn step(&mut self) -> Option<(f64, f64)> {
+    fn step(&mut self) -> Option<(f64, f64)> {
         if self.t > self.max_t {
             return None;
         }
@@ -108,7 +112,7 @@ impl Spirograph {
         Some((x * scale * decay, y * scale * decay))
     }
 
-    pub fn get_param(&self, name: &str) -> Option<f64> {
+    fn get_param(&self, name: &str) -> Option<f64> {
         match name {
             "spiro.big_r" => Some(self.big_r),
             "spiro.small_r" => Some(self.small_r),
@@ -121,7 +125,7 @@ impl Spirograph {
         }
     }
 
-    pub fn set_param(&mut self, name: &str, value: f64) -> bool {
+    fn set_param(&mut self, name: &str, value: f64) -> bool {
         match name {
             "spiro.big_r" => self.big_r = value,
             "spiro.small_r" => self.small_r = value,
@@ -135,7 +139,7 @@ impl Spirograph {
         true
     }
 
-    pub fn all_params(&self) -> Vec<(&'static str, f64)> {
+    fn all_params(&self) -> Vec<(&'static str, f64)> {
         vec![
             ("spiro.big_r", self.big_r),
             ("spiro.small_r", self.small_r),

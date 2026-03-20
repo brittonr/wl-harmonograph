@@ -1,6 +1,7 @@
 use std::f64::consts::PI;
 
 use rand::Rng;
+use super::Shape;
 
 /// Double pendulum — a chaotic mechanical system where a second pendulum
 /// hangs from the end of the first.
@@ -55,101 +56,84 @@ impl DoPendulum {
         s
     }
 
-    /// Compute angular accelerations (α1, α2) from current state.
-    fn accelerations(
-        theta1: f64,
-        theta2: f64,
-        omega1: f64,
-        omega2: f64,
-        l1: f64,
-        l2: f64,
-        m1: f64,
-        m2: f64,
-        g: f64,
-    ) -> (f64, f64) {
+    /// Compute angular accelerations α1 and α2 for the double pendulum system.
+    /// Based on the Lagrangian equations of motion.
+    fn accelerations(&self, theta1: f64, theta2: f64, omega1: f64, omega2: f64) -> (f64, f64) {
         let dt = theta1 - theta2;
-        let sin_dt = dt.sin();
-        let cos_dt = dt.cos();
-        let denom1 = l1 * (2.0 * m1 + m2 - m2 * (2.0 * dt).cos());
-        let denom2 = l2 * (2.0 * m1 + m2 - m2 * (2.0 * dt).cos());
-
-        let alpha1 = (-g * (2.0 * m1 + m2) * theta1.sin()
-            - m2 * g * (theta1 - 2.0 * theta2).sin()
-            - 2.0 * sin_dt * m2
-                * (omega2 * omega2 * l2 + omega1 * omega1 * l1 * cos_dt))
-            / denom1;
-
-        let alpha2 = (2.0
-            * sin_dt
-            * (omega1 * omega1 * l1 * (m1 + m2)
-                + g * (m1 + m2) * theta1.cos()
-                + omega2 * omega2 * l2 * m2 * cos_dt))
-            / denom2;
-
+        let den = 2.0 * self.m1 + self.m2 - self.m2 * (2.0 * dt).cos();
+        
+        let num1 = -self.m2 * self.g * (theta1 - 2.0 * theta2).sin()
+                   - 2.0 * dt.sin() * self.m2
+                     * (omega2 * omega2 * self.l2 + omega1 * omega1 * self.l1 * dt.cos())
+                   - self.g * (2.0 * self.m1 + self.m2) * theta1.sin();
+        
+        let num2 = 2.0 * dt.sin()
+                   * (omega1 * omega1 * self.l1 * (self.m1 + self.m2)
+                      + self.g * (self.m1 + self.m2) * theta1.cos()
+                      + omega2 * omega2 * self.l2 * self.m2 * dt.cos());
+        
+        let alpha1 = num1 / (self.l1 * den);
+        let alpha2 = num2 / (self.l2 * den);
+        
         (alpha1, alpha2)
     }
 
+    /// Runge-Kutta 4th order integration step for the double pendulum.
+    /// State vector: (θ1, θ2, ω1, ω2)
     fn rk4_step(&mut self) {
         let dt = self.dt;
-        let (t1, t2, w1, w2) = (self.theta1, self.theta2, self.omega1, self.omega2);
-        let (l1, l2, m1, m2, g) = (self.l1, self.l2, self.m1, self.m2, self.g);
-
+        
         // k1
-        let (a1_1, a2_1) = Self::accelerations(t1, t2, w1, w2, l1, l2, m1, m2, g);
-        let k1 = (w1, w2, a1_1, a2_1);
-
+        let (alpha1_1, alpha2_1) = self.accelerations(self.theta1, self.theta2, self.omega1, self.omega2);
+        let dtheta1_1 = self.omega1;
+        let dtheta2_1 = self.omega2;
+        let domega1_1 = alpha1_1;
+        let domega2_1 = alpha2_1;
+        
         // k2
-        let (a1_2, a2_2) = Self::accelerations(
-            t1 + 0.5 * dt * k1.0,
-            t2 + 0.5 * dt * k1.1,
-            w1 + 0.5 * dt * k1.2,
-            w2 + 0.5 * dt * k1.3,
-            l1, l2, m1, m2, g,
-        );
-        let k2 = (
-            w1 + 0.5 * dt * k1.2,
-            w2 + 0.5 * dt * k1.3,
-            a1_2,
-            a2_2,
-        );
-
+        let theta1_2 = self.theta1 + 0.5 * dt * dtheta1_1;
+        let theta2_2 = self.theta2 + 0.5 * dt * dtheta2_1;
+        let omega1_2 = self.omega1 + 0.5 * dt * domega1_1;
+        let omega2_2 = self.omega2 + 0.5 * dt * domega2_1;
+        let (alpha1_2, alpha2_2) = self.accelerations(theta1_2, theta2_2, omega1_2, omega2_2);
+        let dtheta1_2 = omega1_2;
+        let dtheta2_2 = omega2_2;
+        let domega1_2 = alpha1_2;
+        let domega2_2 = alpha2_2;
+        
         // k3
-        let (a1_3, a2_3) = Self::accelerations(
-            t1 + 0.5 * dt * k2.0,
-            t2 + 0.5 * dt * k2.1,
-            w1 + 0.5 * dt * k2.2,
-            w2 + 0.5 * dt * k2.3,
-            l1, l2, m1, m2, g,
-        );
-        let k3 = (
-            w1 + 0.5 * dt * k2.2,
-            w2 + 0.5 * dt * k2.3,
-            a1_3,
-            a2_3,
-        );
-
+        let theta1_3 = self.theta1 + 0.5 * dt * dtheta1_2;
+        let theta2_3 = self.theta2 + 0.5 * dt * dtheta2_2;
+        let omega1_3 = self.omega1 + 0.5 * dt * domega1_2;
+        let omega2_3 = self.omega2 + 0.5 * dt * domega2_2;
+        let (alpha1_3, alpha2_3) = self.accelerations(theta1_3, theta2_3, omega1_3, omega2_3);
+        let dtheta1_3 = omega1_3;
+        let dtheta2_3 = omega2_3;
+        let domega1_3 = alpha1_3;
+        let domega2_3 = alpha2_3;
+        
         // k4
-        let (a1_4, a2_4) = Self::accelerations(
-            t1 + dt * k3.0,
-            t2 + dt * k3.1,
-            w1 + dt * k3.2,
-            w2 + dt * k3.3,
-            l1, l2, m1, m2, g,
-        );
-        let k4 = (
-            w1 + dt * k3.2,
-            w2 + dt * k3.3,
-            a1_4,
-            a2_4,
-        );
-
-        self.theta1 = t1 + dt / 6.0 * (k1.0 + 2.0 * k2.0 + 2.0 * k3.0 + k4.0);
-        self.theta2 = t2 + dt / 6.0 * (k1.1 + 2.0 * k2.1 + 2.0 * k3.1 + k4.1);
-        self.omega1 = w1 + dt / 6.0 * (k1.2 + 2.0 * k2.2 + 2.0 * k3.2 + k4.2);
-        self.omega2 = w2 + dt / 6.0 * (k1.3 + 2.0 * k2.3 + 2.0 * k3.3 + k4.3);
+        let theta1_4 = self.theta1 + dt * dtheta1_3;
+        let theta2_4 = self.theta2 + dt * dtheta2_3;
+        let omega1_4 = self.omega1 + dt * domega1_3;
+        let omega2_4 = self.omega2 + dt * domega2_3;
+        let (alpha1_4, alpha2_4) = self.accelerations(theta1_4, theta2_4, omega1_4, omega2_4);
+        let dtheta1_4 = omega1_4;
+        let dtheta2_4 = omega2_4;
+        let domega1_4 = alpha1_4;
+        let domega2_4 = alpha2_4;
+        
+        // Update state
+        self.theta1 += dt * (dtheta1_1 + 2.0 * dtheta1_2 + 2.0 * dtheta1_3 + dtheta1_4) / 6.0;
+        self.theta2 += dt * (dtheta2_1 + 2.0 * dtheta2_2 + 2.0 * dtheta2_3 + dtheta2_4) / 6.0;
+        self.omega1 += dt * (domega1_1 + 2.0 * domega1_2 + 2.0 * domega1_3 + domega1_4) / 6.0;
+        self.omega2 += dt * (domega2_1 + 2.0 * domega2_2 + 2.0 * domega2_3 + domega2_4) / 6.0;
     }
+}
 
-    pub fn randomize(&mut self) {
+impl Shape for DoPendulum {
+
+    fn randomize(&mut self) {
         let mut rng = rand::thread_rng();
 
         // Arm lengths (total ≈ 1.0 for good scaling)
@@ -177,7 +161,7 @@ impl DoPendulum {
         self.steps_done = 0;
     }
 
-    pub fn reset(&mut self) {
+    fn reset(&mut self) {
         let mut rng = rand::thread_rng();
         self.theta1 = rng.gen_range(PI * 0.4..PI * 0.9);
         self.theta2 = rng.gen_range(PI * 0.3..PI * 0.8);
@@ -186,11 +170,11 @@ impl DoPendulum {
         self.steps_done = 0;
     }
 
-    pub fn name() -> &'static str {
+    fn name(&self) -> &'static str {
         "dopendulum"
     }
 
-    pub fn step(&mut self) -> Option<(f64, f64)> {
+    fn step(&mut self) -> Option<(f64, f64)> {
         if self.steps_done >= self.max_steps {
             return None;
         }
@@ -205,7 +189,7 @@ impl DoPendulum {
         Some((x2 / total_l, y2 / total_l))
     }
 
-    pub fn get_param(&self, name: &str) -> Option<f64> {
+    fn get_param(&self, name: &str) -> Option<f64> {
         match name {
             "dpend.l1" => Some(self.l1),
             "dpend.l2" => Some(self.l2),
@@ -217,7 +201,7 @@ impl DoPendulum {
         }
     }
 
-    pub fn set_param(&mut self, name: &str, value: f64) -> bool {
+    fn set_param(&mut self, name: &str, value: f64) -> bool {
         match name {
             "dpend.l1" => self.l1 = value,
             "dpend.l2" => self.l2 = value,
@@ -230,7 +214,7 @@ impl DoPendulum {
         true
     }
 
-    pub fn all_params(&self) -> Vec<(&'static str, f64)> {
+    fn all_params(&self) -> Vec<(&'static str, f64)> {
         vec![
             ("dpend.l1", self.l1),
             ("dpend.l2", self.l2),

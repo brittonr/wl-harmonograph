@@ -2,6 +2,8 @@ use std::f64::consts::PI;
 
 use rand::Rng;
 
+use super::Shape;
+
 #[derive(Clone, Copy)]
 struct Pendulum {
     amplitude: f64,
@@ -61,8 +63,24 @@ impl Harmonograph {
         h.randomize();
         h
     }
+}
 
-    pub fn randomize(&mut self) {
+impl Shape for Harmonograph {
+    fn name(&self) -> &'static str {
+        "harmonograph"
+    }
+
+    fn step(&mut self) -> Option<(f64, f64)> {
+        if self.t > self.max_t {
+            return None;
+        }
+        let x = self.x1.eval(self.t) + self.x2.eval(self.t);
+        let y = self.y1.eval(self.t) + self.y2.eval(self.t);
+        self.t += self.step;
+        Some((x, y))
+    }
+
+    fn randomize(&mut self) {
         let mut rng = rand::thread_rng();
         let base_freq = rng.gen_range(1.0..2.0);
         let ratios: [f64; 4] = [1.0, 2.0, 3.0, 4.0];
@@ -99,25 +117,11 @@ impl Harmonograph {
         self.t = 0.0;
     }
 
-    pub fn reset(&mut self) {
+    fn reset(&mut self) {
         self.t = 0.0;
     }
 
-    pub fn name() -> &'static str {
-        "harmonograph"
-    }
-
-    pub fn step(&mut self) -> Option<(f64, f64)> {
-        if self.t > self.max_t {
-            return None;
-        }
-        let x = self.x1.eval(self.t) + self.x2.eval(self.t);
-        let y = self.y1.eval(self.t) + self.y2.eval(self.t);
-        self.t += self.step;
-        Some((x, y))
-    }
-
-    pub fn get_param(&self, name: &str) -> Option<f64> {
+    fn get_param(&self, name: &str) -> Option<f64> {
         match name {
             "x1.freq" => Some(self.x1.frequency),
             "x1.amp" => Some(self.x1.amplitude),
@@ -141,7 +145,7 @@ impl Harmonograph {
         }
     }
 
-    pub fn set_param(&mut self, name: &str, value: f64) -> bool {
+    fn set_param(&mut self, name: &str, value: f64) -> bool {
         match name {
             "x1.freq" => self.x1.frequency = value,
             "x1.amp" => self.x1.amplitude = value,
@@ -166,7 +170,7 @@ impl Harmonograph {
         true
     }
 
-    pub fn all_params(&self) -> Vec<(&'static str, f64)> {
+    fn all_params(&self) -> Vec<(&'static str, f64)> {
         vec![
             ("x1.freq", self.x1.frequency),
             ("x1.amp", self.x1.amplitude),

@@ -1,4 +1,5 @@
 use rand::Rng;
+use super::Shape;
 
 /// Rössler attractor — Otto Rössler's chaotic system (1976).
 ///
@@ -40,38 +41,48 @@ impl Rossler {
         s
     }
 
-    fn derivatives(&self, x: f64, y: f64, z: f64) -> (f64, f64, f64) {
-        (
-            -y - z,
-            x + self.a * y,
-            self.b + z * (x - self.c),
-        )
-    }
-
     fn rk4_step(&mut self) {
         let dt = self.dt;
-        let (x, y, z) = (self.x, self.y, self.z);
-
-        let (k1x, k1y, k1z) = self.derivatives(x, y, z);
-        let (k2x, k2y, k2z) = self.derivatives(
-            x + 0.5 * dt * k1x,
-            y + 0.5 * dt * k1y,
-            z + 0.5 * dt * k1z,
-        );
-        let (k3x, k3y, k3z) = self.derivatives(
-            x + 0.5 * dt * k2x,
-            y + 0.5 * dt * k2y,
-            z + 0.5 * dt * k2z,
-        );
-        let (k4x, k4y, k4z) =
-            self.derivatives(x + dt * k3x, y + dt * k3y, z + dt * k3z);
-
-        self.x = x + dt / 6.0 * (k1x + 2.0 * k2x + 2.0 * k3x + k4x);
-        self.y = y + dt / 6.0 * (k1y + 2.0 * k2y + 2.0 * k3y + k4y);
-        self.z = z + dt / 6.0 * (k1z + 2.0 * k2z + 2.0 * k3z + k4z);
+        
+        // k1
+        let dx1 = -self.y - self.z;
+        let dy1 = self.x + self.a * self.y;
+        let dz1 = self.b + self.z * (self.x - self.c);
+        
+        // k2
+        let x2 = self.x + 0.5 * dt * dx1;
+        let y2 = self.y + 0.5 * dt * dy1;
+        let z2 = self.z + 0.5 * dt * dz1;
+        let dx2 = -y2 - z2;
+        let dy2 = x2 + self.a * y2;
+        let dz2 = self.b + z2 * (x2 - self.c);
+        
+        // k3
+        let x3 = self.x + 0.5 * dt * dx2;
+        let y3 = self.y + 0.5 * dt * dy2;
+        let z3 = self.z + 0.5 * dt * dz2;
+        let dx3 = -y3 - z3;
+        let dy3 = x3 + self.a * y3;
+        let dz3 = self.b + z3 * (x3 - self.c);
+        
+        // k4
+        let x4 = self.x + dt * dx3;
+        let y4 = self.y + dt * dy3;
+        let z4 = self.z + dt * dz3;
+        let dx4 = -y4 - z4;
+        let dy4 = x4 + self.a * y4;
+        let dz4 = self.b + z4 * (x4 - self.c);
+        
+        // Update state
+        self.x += dt * (dx1 + 2.0 * dx2 + 2.0 * dx3 + dx4) / 6.0;
+        self.y += dt * (dy1 + 2.0 * dy2 + 2.0 * dy3 + dy4) / 6.0;
+        self.z += dt * (dz1 + 2.0 * dz2 + 2.0 * dz3 + dz4) / 6.0;
     }
+}
 
-    pub fn randomize(&mut self) {
+impl Shape for Rossler {
+
+    fn randomize(&mut self) {
         let mut rng = rand::thread_rng();
 
         // Stay near the chaotic regime but allow variation
@@ -87,7 +98,7 @@ impl Rossler {
         self.steps_done = 0;
     }
 
-    pub fn reset(&mut self) {
+    fn reset(&mut self) {
         let mut rng = rand::thread_rng();
         self.x = rng.gen_range(-2.0..2.0);
         self.y = rng.gen_range(-2.0..2.0);
@@ -95,11 +106,11 @@ impl Rossler {
         self.steps_done = 0;
     }
 
-    pub fn name() -> &'static str {
+    fn name(&self) -> &'static str {
         "rossler"
     }
 
-    pub fn step(&mut self) -> Option<(f64, f64)> {
+    fn step(&mut self) -> Option<(f64, f64)> {
         if self.steps_done >= self.max_steps {
             return None;
         }
@@ -114,7 +125,7 @@ impl Rossler {
         Some((px, py))
     }
 
-    pub fn get_param(&self, name: &str) -> Option<f64> {
+    fn get_param(&self, name: &str) -> Option<f64> {
         match name {
             "ross.a" => Some(self.a),
             "ross.b" => Some(self.b),
@@ -125,7 +136,7 @@ impl Rossler {
         }
     }
 
-    pub fn set_param(&mut self, name: &str, value: f64) -> bool {
+    fn set_param(&mut self, name: &str, value: f64) -> bool {
         match name {
             "ross.a" => self.a = value,
             "ross.b" => self.b = value,
@@ -137,7 +148,7 @@ impl Rossler {
         true
     }
 
-    pub fn all_params(&self) -> Vec<(&'static str, f64)> {
+    fn all_params(&self) -> Vec<(&'static str, f64)> {
         vec![
             ("ross.a", self.a),
             ("ross.b", self.b),
