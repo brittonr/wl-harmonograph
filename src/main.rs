@@ -1,4 +1,4 @@
-//! Animated harmonograph wallpaper for Sway/Wayland.
+//! Animated mathematical wallpaper for Sway/Wayland.
 //!
 //! GPU-accelerated rendering using EGL + OpenGL ES 2.0 on top of
 //! smithay-client-toolkit with wlr-layer-shell. The GPU draws anti-aliased
@@ -21,8 +21,8 @@ use calloop_wayland_source::WaylandSource;
 use control::ControlSocket;
 use glow::HasContext;
 use log::{info, warn};
-use wl_harmonograph::shapes::{self, CurveDrawer};
-use wl_harmonograph::{Color, colors_from_env, parse_env_f32, parse_env_f64, parse_env_u32, parse_hex_color, pick_random_color, resolve_shape_env};
+use wl_walls::shapes::{self, CurveDrawer};
+use wl_walls::{Color, colors_from_env, parse_env_f32, parse_env_f64, parse_env_u32, parse_hex_color, pick_random_color, resolve_shape_env};
 use rand::Rng;
 use smithay_client_toolkit::compositor::{CompositorHandler, CompositorState};
 use smithay_client_toolkit::output::{OutputHandler, OutputState};
@@ -607,7 +607,7 @@ impl App {
             &self.qh,
             surface,
             Layer::Background,
-            Some("wl-harmonograph"),
+            Some("wl-walls"),
             Some(wl_output),
         );
         layer.set_anchor(Anchor::TOP | Anchor::BOTTOM | Anchor::LEFT | Anchor::RIGHT);
@@ -1057,14 +1057,14 @@ fn init_egl(
 ///
 /// True when:
 ///   - `--ascii` or `-a` flag is passed
-///   - `HARMONOGRAPH_MODE=ascii` env var is set
+///   - `WALLS_MODE=ascii` env var is set
 ///   - `WAYLAND_DISPLAY` is unset (no compositor available)
 fn should_use_ascii() -> bool {
     let args: Vec<String> = env::args().collect();
     if args.iter().any(|a| a == "--ascii" || a == "-a") {
         return true;
     }
-    if let Ok(mode) = env::var("HARMONOGRAPH_MODE") {
+    if let Ok(mode) = env::var("WALLS_MODE") {
         if mode.eq_ignore_ascii_case("ascii") {
             return true;
         }
@@ -1080,7 +1080,7 @@ fn main() {
     env_logger::init();
 
     if should_use_ascii() {
-        wl_harmonograph::ascii::run();
+        wl_walls::ascii::run();
         return;
     }
 
@@ -1105,14 +1105,14 @@ fn run_wayland() {
     let mut rng = rand::thread_rng();
     let current_color = fg_colors[rng.gen_range(0..fg_colors.len())];
 
-    let steps_per_tick = parse_env_u32("HARMONOGRAPH_SPEED", 1).max(1);
-    let fps = parse_env_u32("HARMONOGRAPH_FPS", 30).clamp(1, 144);
-    let fade_amount = parse_env_f32("HARMONOGRAPH_FADE", 0.005).max(0.0);
-    let line_width = parse_env_f64("HARMONOGRAPH_LINE_WIDTH", 2.0).max(0.5);
-    let line_alpha = parse_env_f32("HARMONOGRAPH_ALPHA", 0.85).clamp(0.01, 1.0);
-    let dither_strength = parse_env_f32("HARMONOGRAPH_DITHER", 0.0).clamp(0.0, 1.0);
-    let dither_levels = parse_env_f32("HARMONOGRAPH_DITHER_LEVELS", 8.0).clamp(2.0, 256.0);
-    let dither_scale = parse_env_f32("HARMONOGRAPH_DITHER_SCALE", 1.0).max(1.0);
+    let steps_per_tick = parse_env_u32("WALLS_SPEED", 1).max(1);
+    let fps = parse_env_u32("WALLS_FPS", 30).clamp(1, 144);
+    let fade_amount = parse_env_f32("WALLS_FADE", 0.005).max(0.0);
+    let line_width = parse_env_f64("WALLS_LINE_WIDTH", 2.0).max(0.5);
+    let line_alpha = parse_env_f32("WALLS_ALPHA", 0.85).clamp(0.01, 1.0);
+    let dither_strength = parse_env_f32("WALLS_DITHER", 0.0).clamp(0.0, 1.0);
+    let dither_levels = parse_env_f32("WALLS_DITHER_LEVELS", 8.0).clamp(2.0, 256.0);
+    let dither_scale = parse_env_f32("WALLS_DITHER_SCALE", 1.0).max(1.0);
     let frame_interval = Duration::from_millis((1000 / fps as u64).max(1));
 
     let (shape_lock, initial_shape) = resolve_shape_env();

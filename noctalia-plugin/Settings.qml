@@ -48,7 +48,7 @@ ColumnLayout {
   // ── General ──
 
   NHeader {
-    label: "Harmonograph Wallpaper"
+    label: "Walls"
     description: "Animated mathematical curves rendered as a Wayland wallpaper"
   }
 
@@ -243,25 +243,25 @@ ColumnLayout {
     NButton {
       text: "Randomize"
       outlined: true
-      onClicked: Quickshell.execDetached(["wl-harmonograph-ctl", "randomize"])
+      onClicked: Quickshell.execDetached(["wl-walls-ctl", "randomize"])
     }
 
     NButton {
       text: "Next Shape"
       outlined: true
-      onClicked: Quickshell.execDetached(["wl-harmonograph-ctl", "next-shape"])
+      onClicked: Quickshell.execDetached(["wl-walls-ctl", "next-shape"])
     }
 
     NButton {
       text: "Next Color"
       outlined: true
-      onClicked: Quickshell.execDetached(["wl-harmonograph-ctl", "next-color"])
+      onClicked: Quickshell.execDetached(["wl-walls-ctl", "next-color"])
     }
 
     NButton {
       text: "Clear"
       outlined: true
-      onClicked: Quickshell.execDetached(["wl-harmonograph-ctl", "restart"])
+      onClicked: Quickshell.execDetached(["wl-walls-ctl", "restart"])
     }
   }
 }

@@ -1,6 +1,6 @@
 //! Unix socket control interface for live parameter adjustment.
 //!
-//! Listens on `$XDG_RUNTIME_DIR/wl-harmonograph.sock` (or `/tmp/` as
+//! Listens on `$XDG_RUNTIME_DIR/wl-walls.sock` (or `/tmp/` as
 //! fallback) for line-based text commands:
 //!
 //!   get                 — dump all parameters as key=value lines
@@ -24,7 +24,7 @@ pub struct ControlSocket {
 impl ControlSocket {
     pub fn bind() -> std::io::Result<Self> {
         let dir = std::env::var("XDG_RUNTIME_DIR").unwrap_or_else(|_| "/tmp".into());
-        let socket_path = PathBuf::from(dir).join("wl-harmonograph.sock");
+        let socket_path = PathBuf::from(dir).join("wl-walls.sock");
         let _ = std::fs::remove_file(&socket_path);
         let listener = UnixListener::bind(&socket_path)?;
         listener.set_nonblocking(true)?;

@@ -1,5 +1,5 @@
 {
-  description = "Animated harmonograph wallpaper for Sway/Wayland";
+  description = "Animated mathematical wallpaper for Sway/Wayland";
 
   inputs.nixpkgs.url = "nixpkgs/nixos-unstable";
 
@@ -14,8 +14,8 @@
         let
           pkgs = nixpkgsFor.${system};
         in rec {
-          wl-harmonograph = pkgs.rustPlatform.buildRustPackage {
-            pname = "wl-harmonograph";
+          wl-walls = pkgs.rustPlatform.buildRustPackage {
+            pname = "wl-walls";
             inherit version;
 
             src = ./.;
@@ -39,39 +39,39 @@
               patchelf --add-rpath ${pkgs.lib.makeLibraryPath [
                 pkgs.libglvnd
                 pkgs.mesa
-              ]} $out/bin/wl-harmonograph
-              # wl-harmonograph-ctl doesn't need GL rpath
+              ]} $out/bin/wl-walls
+              # wl-walls-ctl doesn't need GL rpath
             '';
 
             meta = with pkgs.lib; {
-              description = "Animated harmonograph wallpaper for Sway/Wayland";
+              description = "Animated mathematical wallpaper for Sway/Wayland";
               license = licenses.mit;
               platforms = platforms.linux;
-              mainProgram = "wl-harmonograph";
+              mainProgram = "wl-walls";
             };
           };
 
-          wl-harmonograph-ctl = wl-harmonograph.overrideAttrs (_: {
-            meta.mainProgram = "wl-harmonograph-ctl";
+          wl-walls-ctl = wl-walls.overrideAttrs (_: {
+            meta.mainProgram = "wl-walls-ctl";
           });
 
           noctalia-plugin = pkgs.stdenvNoCC.mkDerivation {
-            pname = "wl-harmonograph-noctalia-plugin";
+            pname = "wl-walls-noctalia-plugin";
             inherit version;
             src = ./noctalia-plugin;
             dontBuild = true;
             installPhase = ''
-              mkdir -p $out/share/noctalia/plugins/wl-harmonograph
-              cp -r $src/* $out/share/noctalia/plugins/wl-harmonograph/
+              mkdir -p $out/share/noctalia/plugins/wl-walls
+              cp -r $src/* $out/share/noctalia/plugins/wl-walls/
             '';
             meta = with pkgs.lib; {
-              description = "Noctalia settings plugin for wl-harmonograph";
+              description = "Noctalia settings plugin for wl-walls";
               license = licenses.mit;
               platforms = platforms.linux;
             };
           };
 
-          default = wl-harmonograph;
+          default = wl-walls;
         });
     };
 }

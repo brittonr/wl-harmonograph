@@ -1,17 +1,16 @@
-# wl-harmonograph
+# wl-walls
 
-Animated wallpaper for Sway/Wayland that draws
-[harmonograph](https://en.wikipedia.org/wiki/Harmonograph) patterns in the
-background. A harmonograph simulates the motion of a damped pendulum system -
-two pendulums control the X axis and two control the Y axis, each with their
-own frequency, phase, amplitude, and damping. The interference between these
-pendulums traces out intricate, slowly decaying curves.
+Animated wallpaper for Sway/Wayland that draws mathematical curves in the
+background. Shapes range from classic
+[harmonograph](https://en.wikipedia.org/wiki/Harmonograph) pendulums to
+chaotic attractors and 3D surface projections. Each curve traces out slowly,
+accumulating trails that fade over time.
 
 When a pattern finishes, the screen clears and a new one begins with fresh
 random parameters, a different color, and potentially a different shape,
 resulting in a unique wallpaper on every restart.
 
-Eight shape types are available:
+Fifteen shape types are available:
 
 | Shape | Description |
 |---|---|
@@ -21,8 +20,15 @@ Eight shape types are available:
 | **rose** | Polar flower curves with optional compound petals |
 | **butterfly** | Temple Fay's butterfly curve (1989) |
 | **lorenz** | Lorenz strange attractor — chaotic double-spiral |
+| **rossler** | Rössler attractor — folded-band spiral |
+| **clifford** | Clifford attractor — feathery swirl patterns |
+| **dejong** | De Jong attractor — symmetric star/floral structures |
+| **superformula** | Gielis superformula — starfish to polygons |
+| **guilloche** | Banknote-style engraving patterns |
+| **dopendulum** | Double pendulum — chaotic arm motion |
 | **wireframe** | Rotating 3D Platonic solids (cube, icosahedron, …) |
 | **torusknot** | 3D torus knots — curves wound around a torus |
+| **surface** | 3D surfaces (torus, sphere, Möbius strip, …) |
 
 <p align="center">
   <img src="https://github.com/user-attachments/assets/c6d704e0-d39b-4620-974b-209fdba3255a" width="30%" />
@@ -37,13 +43,13 @@ ASCII art — no Wayland or GPU required. Each cell accumulates intensity as
 curves pass through it and maps to a character ramp (` .,:;=!*#$@`).
 
 ```bash
-wl-harmonograph-ascii                              # random shape
-HARMONOGRAPH_SHAPE=wireframe wl-harmonograph-ascii  # specific shape
+wl-walls --ascii                          # random shape
+WALLS_SHAPE=wireframe wl-walls --ascii    # specific shape
 ```
 
 Keys: `r` randomize, `s` next shape, `c` next color, `space` restart, `q` quit.
 
-Reads the same `HARMONOGRAPH_*` env vars. Speed defaults to 50 (steps per
+Reads the same `WALLS_*` env vars. Speed defaults to 50 (steps per
 frame) since each step plots a single point rather than a GPU-interpolated
 segment.
 
@@ -54,7 +60,7 @@ smithay-client-toolkit with wlr-layer-shell:
 
 - Curve segments are rasterized on the GPU as triangle strips into an FBO
   that accumulates over time
-- Each tick the CPU computes only 3 pendulum positions and submits 3
+- Each tick the CPU computes only a few curve positions and submits
   triangle-strip draw calls
 - Catmull-Rom spline interpolation for smooth anti-aliased curves
 - Supports multiple monitors at native resolution
@@ -68,19 +74,19 @@ Remove any existing `output * bg ...` or `exec swaybg` lines and add to your
 Sway config (`~/.config/sway/config`):
 
 ```
-exec wl-harmonograph
+exec wl-walls
 ```
 
 ### Install
 
 ```bash
-nix run github:pinpox/wl-harmonograph
+nix run github:brittonr/wl-walls
 ```
 
 Or:
 
 ```bash
-nix profile install github:pinpox/wl-harmonograph
+nix profile install github:brittonr/wl-walls
 ```
 
 ### Configuration
@@ -91,10 +97,10 @@ All settings are controlled with environment variables.
 
 ```bash
 # Foreground colors (comma-separated hex, cycles through them)
-export HARMONOGRAPH_FG="#fb4934,#b8bb26,#fe8019"
+export WALLS_FG="#fb4934,#b8bb26,#fe8019"
 
 # Background color
-export HARMONOGRAPH_BG="#1d2021"
+export WALLS_BG="#1d2021"
 ```
 
 Default colors are gruvbox-inspired.
@@ -103,17 +109,17 @@ Default colors are gruvbox-inspired.
 
 | Variable | Default | Description |
 |---|---|---|
-| `HARMONOGRAPH_SHAPE` | `random` | Shape type or `random` to cycle through all |
+| `WALLS_SHAPE` | `random` | Shape type or `random` to cycle through all |
 
 **Rendering:**
 
 | Variable | Default | Description |
 |---|---|---|
-| `HARMONOGRAPH_LINE_WIDTH` | `2.0` | Line thickness in pixels |
-| `HARMONOGRAPH_ALPHA` | `0.85` | Line opacity (0.01–1.0) |
-| `HARMONOGRAPH_FADE` | `0.005` | Trail fade speed per frame (0 = no fade) |
-| `HARMONOGRAPH_SPEED` | `1` | Simulation steps per frame |
-| `HARMONOGRAPH_FPS` | `30` | Target frame rate (1–144) |
+| `WALLS_LINE_WIDTH` | `2.0` | Line thickness in pixels |
+| `WALLS_ALPHA` | `0.85` | Line opacity (0.01–1.0) |
+| `WALLS_FADE` | `0.005` | Trail fade speed per frame (0 = no fade) |
+| `WALLS_SPEED` | `1` | Simulation steps per frame |
+| `WALLS_FPS` | `30` | Target frame rate (1–144) |
 
 **Dithering:**
 
@@ -124,23 +130,23 @@ retro, screen-printed look.
 
 | Variable | Default | Description |
 |---|---|---|
-| `HARMONOGRAPH_DITHER` | `0.0` | Dithering strength (0 = off, 1 = full) |
-| `HARMONOGRAPH_DITHER_LEVELS` | `8.0` | Color levels per channel (2 = 1-bit, 256 = subtle) |
-| `HARMONOGRAPH_DITHER_SCALE` | `1.0` | Dither cell size in pixels (try 2–3 on HiDPI) |
+| `WALLS_DITHER` | `0.0` | Dithering strength (0 = off, 1 = full) |
+| `WALLS_DITHER_LEVELS` | `8.0` | Color levels per channel (2 = 1-bit, 256 = subtle) |
+| `WALLS_DITHER_SCALE` | `1.0` | Dither cell size in pixels (try 2–3 on HiDPI) |
 
 Example — heavy retro dithering:
 
 ```bash
-export HARMONOGRAPH_DITHER=1.0
-export HARMONOGRAPH_DITHER_LEVELS=4
-export HARMONOGRAPH_DITHER_SCALE=2
+export WALLS_DITHER=1.0
+export WALLS_DITHER_LEVELS=4
+export WALLS_DITHER_SCALE=2
 ```
 
 Example — subtle banding reduction:
 
 ```bash
-export HARMONOGRAPH_DITHER=0.5
-export HARMONOGRAPH_DITHER_LEVELS=32
+export WALLS_DITHER=0.5
+export WALLS_DITHER_LEVELS=32
 ```
 
 ### Live Control
@@ -149,15 +155,15 @@ While the wallpaper is running, you can tweak every parameter in real time
 using the companion control tool:
 
 ```bash
-wl-harmonograph-ctl
+wl-walls-ctl
 ```
 
 This opens an interactive TUI where you adjust line width, alpha, fade,
-dithering, and all four pendulum parameters (frequency, amplitude, phase,
-damping) with immediate visual feedback on the wallpaper.
+dithering, and all shape parameters with immediate visual feedback on the
+wallpaper.
 
 ```
-● wl-harmonograph  shape: spirograph
+● wl-walls  shape: spirograph
   Drawing
   ▸ Line Width     ████████░░░░░░░░░░░░       2.0
     Alpha          █████████████████░░░       0.85
@@ -175,17 +181,17 @@ damping) with immediate visual feedback on the wallpaper.
 You can also send one-off commands from scripts:
 
 ```bash
-wl-harmonograph-ctl get                   # dump all current values
-wl-harmonograph-ctl set alpha 0.5         # set a parameter
-wl-harmonograph-ctl set bg '#282828'      # change background color
-wl-harmonograph-ctl set shape lorenz      # switch to a specific shape
-wl-harmonograph-ctl randomize             # new random pattern + shape
-wl-harmonograph-ctl next-color            # cycle foreground color
-wl-harmonograph-ctl next-shape            # cycle to next shape type
-wl-harmonograph-ctl restart               # clear canvas, redraw with current params
+wl-walls-ctl get                   # dump all current values
+wl-walls-ctl set alpha 0.5         # set a parameter
+wl-walls-ctl set bg '#282828'      # change background color
+wl-walls-ctl set shape lorenz      # switch to a specific shape
+wl-walls-ctl randomize             # new random pattern + shape
+wl-walls-ctl next-color            # cycle foreground color
+wl-walls-ctl next-shape            # cycle to next shape type
+wl-walls-ctl restart               # clear canvas, redraw with current params
 ```
 
-The daemon listens on `$XDG_RUNTIME_DIR/wl-harmonograph.sock`.
+The daemon listens on `$XDG_RUNTIME_DIR/wl-walls.sock`.
 
 ## Requirements
 
@@ -195,7 +201,3 @@ The daemon listens on `$XDG_RUNTIME_DIR/wl-harmonograph.sock`.
 ## License
 
 MIT
-
----
-
-This project is a rewrite of my old [wallpaper-generator](https://github.com/pinpox/wallpaper-generator).

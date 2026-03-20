@@ -1,4 +1,4 @@
-//! Terminal ASCII renderer for harmonograph patterns.
+//! Terminal ASCII renderer for mathematical curve patterns.
 //!
 //! Draws the same mathematical curves as the Wayland wallpaper, rendered as
 //! density-mapped ASCII art. Each terminal cell accumulates intensity as
@@ -32,9 +32,9 @@ pub fn run() {
     let mut rng = rand::thread_rng();
     let current_color = fg_colors[rng.gen_range(0..fg_colors.len())];
 
-    let fps = parse_env_u32("HARMONOGRAPH_FPS", 30).clamp(1, 144);
-    let fade = parse_env_f32("HARMONOGRAPH_FADE", 0.03);
-    let steps = parse_env_u32("HARMONOGRAPH_SPEED", 50).max(1);
+    let fps = parse_env_u32("WALLS_FPS", 30).clamp(1, 144);
+    let fade = parse_env_f32("WALLS_FADE", 0.03);
+    let steps = parse_env_u32("WALLS_SPEED", 50).max(1);
 
     let (shape_lock, initial_shape) = resolve_shape_env();
 

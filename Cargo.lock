@@ -2185,7 +2185,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "wl-harmonograph"
+name = "wl-walls"
 version = "0.1.0"
 dependencies = [
  "calloop",

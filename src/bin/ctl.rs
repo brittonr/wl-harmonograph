@@ -1,16 +1,16 @@
-//! Live control TUI for wl-harmonograph.
+//! Live control TUI for wl-walls.
 //!
 //! Interactive mode (no args): full-screen parameter editor with sliders.
 //! CLI mode (with args): send a single command and print the response.
 //!
-//!   wl-harmonograph-ctl                     # interactive TUI
-//!   wl-harmonograph-ctl get                 # dump all params
-//!   wl-harmonograph-ctl set alpha 0.5       # set a param
-//!   wl-harmonograph-ctl set shape lorenz    # switch shape
-//!   wl-harmonograph-ctl restart             # clear + redraw
-//!   wl-harmonograph-ctl randomize           # new random pattern
-//!   wl-harmonograph-ctl next-color          # cycle color
-//!   wl-harmonograph-ctl next-shape          # cycle shape
+//!   wl-walls-ctl                     # interactive TUI
+//!   wl-walls-ctl get                 # dump all params
+//!   wl-walls-ctl set alpha 0.5       # set a param
+//!   wl-walls-ctl set shape lorenz    # switch shape
+//!   wl-walls-ctl restart             # clear + redraw
+//!   wl-walls-ctl randomize           # new random pattern
+//!   wl-walls-ctl next-color          # cycle color
+//!   wl-walls-ctl next-shape          # cycle shape
 
 use std::f64::consts::TAU;
 use std::io::{self, Read, Write as _};
@@ -35,14 +35,14 @@ use ratatui::Terminal;
 
 fn socket_path() -> PathBuf {
     let dir = std::env::var("XDG_RUNTIME_DIR").unwrap_or_else(|_| "/tmp".into());
-    PathBuf::from(dir).join("wl-harmonograph.sock")
+    PathBuf::from(dir).join("wl-walls.sock")
 }
 
 fn send_command(cmd: &str) -> Result<String, String> {
     let path = socket_path();
     let mut stream = UnixStream::connect(&path).map_err(|e| {
         format!(
-            "cannot connect to {} — is wl-harmonograph running?\n({})",
+            "cannot connect to {} — is wl-walls running?\n({})",
             path.display(),
             e
         )
@@ -491,7 +491,7 @@ fn draw(
             let header = Line::from(vec![
                 Span::styled("● ", Style::default().fg(Color::Green)),
                 Span::styled(
-                    "wl-harmonograph",
+                    "wl-walls",
                     Style::default()
                         .fg(Color::White)
                         .add_modifier(Modifier::BOLD),
@@ -643,7 +643,7 @@ fn draw(
 
 fn run_tui() -> Result<(), String> {
     let (mut shape_name, mut params, mut sections) =
-        build_params_from_daemon().ok_or("cannot connect — is wl-harmonograph running?")?;
+        build_params_from_daemon().ok_or("cannot connect — is wl-walls running?")?;
     let mut display_lines = build_display_lines(&sections);
 
     terminal::enable_raw_mode().map_err(|e| e.to_string())?;

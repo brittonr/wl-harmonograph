@@ -25,18 +25,18 @@ Item {
   readonly property string bgColor: pluginApi?.pluginSettings?.bgColor ?? "#1d1f23"
   readonly property string fgColors: pluginApi?.pluginSettings?.fgColors ?? "#fb4934,#98971a,#fcb157,#83a598,#d3869b,#8ec07c,#e4d398"
 
-  // Build environment for wl-harmonograph
+  // Build environment for wl-walls
   function buildEnv() {
     let env = [];
-    env.push("HARMONOGRAPH_SHAPE=" + shape);
-    env.push("HARMONOGRAPH_FPS=" + fps);
-    env.push("HARMONOGRAPH_SPEED=" + speed);
-    env.push("HARMONOGRAPH_LINE_WIDTH=" + lineWidth);
-    env.push("HARMONOGRAPH_ALPHA=" + alpha);
-    env.push("HARMONOGRAPH_FADE=" + fade);
-    env.push("HARMONOGRAPH_DITHER=" + ditherStrength);
-    env.push("HARMONOGRAPH_DITHER_LEVELS=" + ditherLevels);
-    env.push("HARMONOGRAPH_DITHER_SCALE=" + ditherScale);
+    env.push("WALLS_SHAPE=" + shape);
+    env.push("WALLS_FPS=" + fps);
+    env.push("WALLS_SPEED=" + speed);
+    env.push("WALLS_LINE_WIDTH=" + lineWidth);
+    env.push("WALLS_ALPHA=" + alpha);
+    env.push("WALLS_FADE=" + fade);
+    env.push("WALLS_DITHER=" + ditherStrength);
+    env.push("WALLS_DITHER_LEVELS=" + ditherLevels);
+    env.push("WALLS_DITHER_SCALE=" + ditherScale);
 
     if (useThemeColors) {
       // Pull colors from the Noctalia theme
@@ -44,20 +44,20 @@ Item {
       let secondary = Color.mSecondary.toString();
       let tertiary = Color.mTertiary.toString();
       let bg = Color.mSurface.toString();
-      env.push("HARMONOGRAPH_FG=" + primary + "," + secondary + "," + tertiary);
-      env.push("HARMONOGRAPH_BG=" + bg);
+      env.push("WALLS_FG=" + primary + "," + secondary + "," + tertiary);
+      env.push("WALLS_BG=" + bg);
     } else {
-      env.push("HARMONOGRAPH_FG=" + fgColors);
-      env.push("HARMONOGRAPH_BG=" + bgColor);
+      env.push("WALLS_FG=" + fgColors);
+      env.push("WALLS_BG=" + bgColor);
     }
 
     return env;
   }
 
-  // Send a command to the running instance via wl-harmonograph-ctl
+  // Send a command to the running instance via wl-walls-ctl
   function sendCtl(command) {
     ctlProcess.exec({
-      "command": ["sh", "-c", "wl-harmonograph-ctl " + command]
+      "command": ["sh", "-c", "wl-walls-ctl " + command]
     });
   }
 
@@ -86,54 +86,54 @@ Item {
     }
   }
 
-  function startHarmonograph() {
+  function startWalls() {
     if (isRunning) return;
 
     // Kill any stale instance first
-    Quickshell.execDetached(["sh", "-c", "pkill -f 'wl-harmonograph$' 2>/dev/null; sleep 0.2"]);
+    Quickshell.execDetached(["sh", "-c", "pkill -f 'wl-walls$' 2>/dev/null; sleep 0.2"]);
 
     let env = buildEnv();
     let envStr = env.join(" ");
-    harmonographProcess.exec({
-      "command": ["sh", "-c", "exec env " + envStr + " wl-harmonograph"]
+    wallsProcess.exec({
+      "command": ["sh", "-c", "exec env " + envStr + " wl-walls"]
     });
 
     // Check after a moment if the process stuck around
     startCheckTimer.running = true;
   }
 
-  function stopHarmonograph() {
-    Quickshell.execDetached(["sh", "-c", "pkill -f 'wl-harmonograph$' 2>/dev/null || true"]);
+  function stopWalls() {
+    Quickshell.execDetached(["sh", "-c", "pkill -f 'wl-walls$' 2>/dev/null || true"]);
     isRunning = false;
   }
 
-  function restartHarmonograph() {
-    stopHarmonograph();
+  function restartWalls() {
+    stopWalls();
     restartTimer.running = true;
   }
 
   // IPC handler so other plugins/keybinds can control it
   IpcHandler {
-    target: "plugin:wl-harmonograph"
+    target: "plugin:wl-walls"
 
-    function start() { root.startHarmonograph(); }
-    function stop() { root.stopHarmonograph(); }
-    function restart() { root.restartHarmonograph(); }
+    function start() { root.startWalls(); }
+    function stop() { root.stopWalls(); }
+    function restart() { root.restartWalls(); }
     function randomize() { root.sendCtl("randomize"); }
     function nextShape() { root.sendCtl("next-shape"); }
     function nextColor() { root.sendCtl("next-color"); }
   }
 
-  // The wl-harmonograph process
+  // The wl-walls process
   Process {
-    id: harmonographProcess
+    id: wallsProcess
     stdout: StdioCollector {}
     stderr: StdioCollector {}
     onExited: function(exitCode) {
       root.isRunning = false;
       // Auto-restart on crash if autoStart is enabled
       if (root.autoStart && exitCode !== 0) {
-        Logger.w("Harmonograph", "Process exited with code " + exitCode + ", restarting...");
+        Logger.w("Walls", "Process exited with code " + exitCode + ", restarting...");
         root.restartTimer.running = true;
       }
     }
@@ -153,9 +153,9 @@ Item {
     running: false
     repeat: false
     onTriggered: {
-      if (harmonographProcess.running) {
+      if (wallsProcess.running) {
         root.isRunning = true;
-        Logger.i("Harmonograph", "Wallpaper started");
+        Logger.i("Walls", "Wallpaper started");
       }
     }
   }
@@ -166,19 +166,19 @@ Item {
     interval: 500
     running: false
     repeat: false
-    onTriggered: root.startHarmonograph()
+    onTriggered: root.startWalls()
   }
 
   // Auto-start on plugin load
   Component.onCompleted: {
     if (autoStart) {
-      startHarmonograph();
+      startWalls();
     }
   }
 
   // Clean up on unload
   Component.onDestruction: {
-    stopHarmonograph();
+    stopWalls();
   }
 
   // Re-apply colors when theme changes

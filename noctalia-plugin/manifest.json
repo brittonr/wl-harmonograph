@@ -1,12 +1,12 @@
 {
-  "id": "wl-harmonograph",
-  "name": "Harmonograph Wallpaper",
+  "id": "wl-walls",
+  "name": "Walls",
   "version": "1.0.0",
   "minNoctaliaVersion": "3.6.0",
   "author": "brittonr",
   "official": false,
   "license": "MIT",
-  "repository": "https://github.com/brittonr/wl-harmonograph",
+  "repository": "https://github.com/brittonr/wl-walls",
   "description": "Animated mathematical wallpaper — spirographs, attractors, 3D surfaces, and more drawn as GPU-accelerated curves.",
   "tags": ["Wallpaper", "Desktop"],
   "entryPoints": {

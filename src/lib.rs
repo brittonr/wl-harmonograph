@@ -24,10 +24,10 @@ pub fn pick_random_color(palette: &[Color], current: Color) -> Color {
     palette[rng.gen_range(0..palette.len())]
 }
 
-/// Resolve the `HARMONOGRAPH_SHAPE` env var into an initial shape and
+/// Resolve the `WALLS_SHAPE` env var into an initial shape and
 /// optional lock name (Some = locked to that shape type on restart).
 pub fn resolve_shape_env() -> (Option<String>, Box<dyn shapes::Shape>) {
-    let shape_env = env::var("HARMONOGRAPH_SHAPE").unwrap_or_default();
+    let shape_env = env::var("WALLS_SHAPE").unwrap_or_default();
     match shape_env.to_lowercase().as_str() {
         "" | "random" => (None, shapes::random_shape()),
         name => match shapes::shape_from_name(name) {
@@ -67,7 +67,7 @@ pub fn colors_from_env() -> (Vec<Color>, Color) {
     ];
     let default_bg: Color = (0.114, 0.122, 0.137);
 
-    let fg = env::var("HARMONOGRAPH_FG")
+    let fg = env::var("WALLS_FG")
         .ok()
         .and_then(|s| {
             let c: Vec<Color> = s.split(',').filter_map(parse_hex_color).collect();
@@ -79,7 +79,7 @@ pub fn colors_from_env() -> (Vec<Color>, Color) {
         })
         .unwrap_or(default_fg);
 
-    let bg = env::var("HARMONOGRAPH_BG")
+    let bg = env::var("WALLS_BG")
         .ok()
         .and_then(|s| parse_hex_color(&s))
         .unwrap_or(default_bg);
