@@ -1,20 +1,34 @@
 pub mod butterfly;
+pub mod clifford;
+pub mod dejong;
+pub mod dopendulum;
+pub mod guilloche;
 pub mod harmonograph;
 pub mod lissajous;
 pub mod lorenz;
 pub mod rose;
+pub mod rossler;
 pub mod spirograph;
+pub mod superformula;
+pub mod surface;
 pub mod torusknot;
 pub mod wireframe;
 
 use rand::Rng;
 
 use butterfly::Butterfly;
+use clifford::Clifford;
+use dejong::DeJong;
+use dopendulum::DoPendulum;
+use guilloche::Guilloche;
 use harmonograph::Harmonograph;
 use lissajous::Lissajous;
 use lorenz::Lorenz;
 use rose::Rose;
+use rossler::Rossler;
 use spirograph::Spirograph;
+use superformula::Superformula;
+use surface::Surface;
 use torusknot::TorusKnot;
 use wireframe::Wireframe;
 
@@ -28,6 +42,13 @@ pub const SHAPE_NAMES: &[&str] = &[
     "lorenz",
     "wireframe",
     "torusknot",
+    "clifford",
+    "dejong",
+    "superformula",
+    "guilloche",
+    "dopendulum",
+    "rossler",
+    "surface",
 ];
 
 pub enum Shape {
@@ -39,6 +60,13 @@ pub enum Shape {
     Lorenz(Lorenz),
     Wireframe(Wireframe),
     TorusKnot(TorusKnot),
+    Clifford(Clifford),
+    DeJong(DeJong),
+    Superformula(Superformula),
+    Guilloche(Guilloche),
+    DoPendulum(DoPendulum),
+    Rossler(Rossler),
+    Surface(Surface),
 }
 
 macro_rules! dispatch {
@@ -52,6 +80,13 @@ macro_rules! dispatch {
             Shape::Lorenz(s) => s.$method(),
             Shape::Wireframe(s) => s.$method(),
             Shape::TorusKnot(s) => s.$method(),
+            Shape::Clifford(s) => s.$method(),
+            Shape::DeJong(s) => s.$method(),
+            Shape::Superformula(s) => s.$method(),
+            Shape::Guilloche(s) => s.$method(),
+            Shape::DoPendulum(s) => s.$method(),
+            Shape::Rossler(s) => s.$method(),
+            Shape::Surface(s) => s.$method(),
         }
     };
     ($self:expr, $method:ident, $($arg:expr),+) => {
@@ -64,6 +99,13 @@ macro_rules! dispatch {
             Shape::Lorenz(s) => s.$method($($arg),+),
             Shape::Wireframe(s) => s.$method($($arg),+),
             Shape::TorusKnot(s) => s.$method($($arg),+),
+            Shape::Clifford(s) => s.$method($($arg),+),
+            Shape::DeJong(s) => s.$method($($arg),+),
+            Shape::Superformula(s) => s.$method($($arg),+),
+            Shape::Guilloche(s) => s.$method($($arg),+),
+            Shape::DoPendulum(s) => s.$method($($arg),+),
+            Shape::Rossler(s) => s.$method($($arg),+),
+            Shape::Surface(s) => s.$method($($arg),+),
         }
     };
 }
@@ -80,6 +122,13 @@ impl Shape {
             "lorenz" => Some(Shape::Lorenz(Lorenz::new())),
             "wireframe" => Some(Shape::Wireframe(Wireframe::new())),
             "torusknot" => Some(Shape::TorusKnot(TorusKnot::new())),
+            "clifford" => Some(Shape::Clifford(Clifford::new())),
+            "dejong" => Some(Shape::DeJong(DeJong::new())),
+            "superformula" => Some(Shape::Superformula(Superformula::new())),
+            "guilloche" => Some(Shape::Guilloche(Guilloche::new())),
+            "dopendulum" => Some(Shape::DoPendulum(DoPendulum::new())),
+            "rossler" => Some(Shape::Rossler(Rossler::new())),
+            "surface" => Some(Shape::Surface(Surface::new())),
             _ => None,
         }
     }
@@ -101,6 +150,13 @@ impl Shape {
             Shape::Lorenz(_) => Lorenz::name(),
             Shape::Wireframe(_) => Wireframe::name(),
             Shape::TorusKnot(_) => TorusKnot::name(),
+            Shape::Clifford(_) => Clifford::name(),
+            Shape::DeJong(_) => DeJong::name(),
+            Shape::Superformula(_) => Superformula::name(),
+            Shape::Guilloche(_) => Guilloche::name(),
+            Shape::DoPendulum(_) => DoPendulum::name(),
+            Shape::Rossler(_) => Rossler::name(),
+            Shape::Surface(_) => Surface::name(),
         }
     }
 

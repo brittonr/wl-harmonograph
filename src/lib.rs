@@ -1,3 +1,4 @@
+pub mod ascii;
 pub mod shapes;
 
 use std::env;

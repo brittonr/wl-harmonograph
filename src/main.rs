@@ -5,6 +5,9 @@
 //! curve segments into a framebuffer object (FBO) that accumulates over time.
 //! Each frame the CPU only computes 3 pendulum positions and submits 3
 //! triangle-strip draw calls — all rasterization happens on the GPU.
+//!
+//! When no Wayland display is available (or `--ascii` is passed), falls back
+//! to a terminal ASCII renderer using the same math and color palette.
 
 mod control;
 
@@ -1088,12 +1091,44 @@ fn init_egl(
 }
 
 // ---------------------------------------------------------------------------
+// Mode detection
+// ---------------------------------------------------------------------------
+
+/// Should we run in ASCII terminal mode?
+///
+/// True when:
+///   - `--ascii` or `-a` flag is passed
+///   - `HARMONOGRAPH_MODE=ascii` env var is set
+///   - `WAYLAND_DISPLAY` is unset (no compositor available)
+fn should_use_ascii() -> bool {
+    let args: Vec<String> = env::args().collect();
+    if args.iter().any(|a| a == "--ascii" || a == "-a") {
+        return true;
+    }
+    if let Ok(mode) = env::var("HARMONOGRAPH_MODE") {
+        if mode.eq_ignore_ascii_case("ascii") {
+            return true;
+        }
+    }
+    env::var("WAYLAND_DISPLAY").map_or(true, |v| v.is_empty())
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
 fn main() {
     env_logger::init();
 
+    if should_use_ascii() {
+        wl_harmonograph::ascii::run();
+        return;
+    }
+
+    run_wayland();
+}
+
+fn run_wayland() {
     let conn = Connection::connect_to_env().expect("Failed to connect to Wayland");
     let (globals, mut event_queue) = registry_queue_init(&conn).expect("registry init");
     let qh = event_queue.handle();

@@ -57,6 +57,7 @@
 
           wl-harmonograph-ascii = wl-harmonograph.overrideAttrs (_: {
             meta.mainProgram = "wl-harmonograph-ascii";
+            meta.description = "ASCII terminal mode (also available via wl-harmonograph --ascii)";
           });
 
           default = wl-harmonograph;
