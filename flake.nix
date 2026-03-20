@@ -60,6 +60,22 @@
             meta.description = "ASCII terminal mode (also available via wl-harmonograph --ascii)";
           });
 
+          noctalia-plugin = pkgs.stdenvNoCC.mkDerivation {
+            pname = "wl-harmonograph-noctalia-plugin";
+            inherit version;
+            src = ./noctalia-plugin;
+            dontBuild = true;
+            installPhase = ''
+              mkdir -p $out/share/noctalia/plugins/wl-harmonograph
+              cp -r $src/* $out/share/noctalia/plugins/wl-harmonograph/
+            '';
+            meta = with pkgs.lib; {
+              description = "Noctalia settings plugin for wl-harmonograph";
+              license = licenses.mit;
+              platforms = platforms.linux;
+            };
+          };
+
           default = wl-harmonograph;
         });
     };

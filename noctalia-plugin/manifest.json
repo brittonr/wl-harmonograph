@@ -1,0 +1,36 @@
+{
+  "id": "wl-harmonograph",
+  "name": "Harmonograph Wallpaper",
+  "version": "1.0.0",
+  "minNoctaliaVersion": "3.6.0",
+  "author": "brittonr",
+  "official": false,
+  "license": "MIT",
+  "repository": "https://github.com/brittonr/wl-harmonograph",
+  "description": "Animated mathematical wallpaper — spirographs, attractors, 3D surfaces, and more drawn as GPU-accelerated curves.",
+  "tags": ["Wallpaper", "Desktop"],
+  "entryPoints": {
+    "main": "Main.qml",
+    "settings": "Settings.qml"
+  },
+  "dependencies": {
+    "plugins": []
+  },
+  "metadata": {
+    "defaultSettings": {
+      "autoStart": true,
+      "shape": "random",
+      "fps": "30",
+      "speed": 1,
+      "lineWidth": 2.0,
+      "alpha": 0.85,
+      "fade": 0.005,
+      "ditherStrength": 0.0,
+      "ditherLevels": 8,
+      "ditherScale": 1.0,
+      "useThemeColors": true,
+      "bgColor": "#1d1f23",
+      "fgColors": "#fb4934,#98971a,#fcb157,#83a598,#d3869b,#8ec07c,#e4d398"
+    }
+  }
+}
