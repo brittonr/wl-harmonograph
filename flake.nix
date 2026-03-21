@@ -21,7 +21,7 @@
             src = ./.;
 
             # Update after changing dependencies: nix build 2>&1 | grep 'got:'
-            cargoHash = "sha256-fP71ga8km52ucbPxKCqmp7Ew8mcSv8pvcm1qBnLpga0=";
+            cargoHash = "sha256-5QoBXDfiPNRUVIj9f+YLCr3r+e17c15A8VCZPXFnTZE=";
 
             nativeBuildInputs = with pkgs; [
               pkg-config
